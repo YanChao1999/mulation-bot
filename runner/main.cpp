@@ -356,7 +356,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    int killed = 0, survived = 0, timeout_n = 0, skipped = 0;
+    int killed = 0, survived = 0, timeout_n = 0;
     std::vector<Mutant> survivors;
     std::vector<Mutant> uncovered;
 
@@ -370,7 +370,6 @@ int main(int argc, char **argv) {
     for (const Mutant &m : mutants) {
         ++idx;
         if (!opt.no_coverage && !covered.empty() && !covered.count(m.id)) {
-            ++skipped;
             uncovered.push_back(m);
             continue;
         }

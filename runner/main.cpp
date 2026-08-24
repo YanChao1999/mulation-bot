@@ -261,25 +261,6 @@ Options parse_args(int argc, char **argv) {
     return o;
 }
 
-std::string suggestion(const Mutant &m) {
-    if (m.kind == "ROR") {
-        return "add a boundary case that distinguishes `" + m.op + "` from `" + m.mut + "`";
-    }
-    if (m.kind == "AOR") {
-        return "assert the exact arithmetic result (not only a smoke value)";
-    }
-    if (m.kind == "LCR") {
-        return "add a case where `&&` and `||` disagree";
-    }
-    if (m.kind == "BOR") {
-        return "add a case where `&` and `|` disagree";
-    }
-    if (m.kind == "LVR") {
-        return "cover the zero/one literal independently";
-    }
-    return "add an assertion that would fail if this operator changed";
-}
-
 std::set<uint32_t> load_hitlog(const std::string &path) {
     std::set<uint32_t> ids;
     std::ifstream in(path);
@@ -470,14 +451,14 @@ int main(int argc, char **argv) {
     std::cout << "  score:     " << score << "%\n";
 
     if (!survivors.empty() || !uncovered.empty()) {
-        std::cout << "\nSurvived (tests would miss this bug in production):\n";
+        std::cout << "\nSurvived:\n";
         auto dump = [](const Mutant &m, const char *tag) {
             std::cout << "  " << m.file << ":" << m.line << ":" << m.col << "  [" << m.kind << "] `"
                       << m.op << "` -> `" << m.mut << "`";
             if (tag) {
                 std::cout << "  " << tag;
             }
-            std::cout << "\n    suggestion: " << suggestion(m) << "\n";
+            std::cout << "\n";
         };
         for (const Mutant &m : survivors) {
             dump(m, nullptr);

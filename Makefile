@@ -64,7 +64,18 @@ $(EXAMPLE): $(BUILD)/compare.o $(BUILD)/compare_test.o $(RUNTIME)
 example: $(EXAMPLE) $(RUNNER)
 
 test: $(UNIT) $(RUNTIME_TEST) example
-	sh scripts/run-tests.sh $(EXAMPLE)
+	@echo "== runner =="
+	$(UNIT)
+	@echo "== runtime =="
+	@env -u MULATION_MUTANT $(RUNTIME_TEST) 1 0
+	@MULATION_MUTANT=42 $(RUNTIME_TEST) 42 1
+	@MULATION_MUTANT=42 $(RUNTIME_TEST) 7 0
+	@tmp=$$(mktemp); \
+	  MULATION_HITLOG=$$tmp env -u MULATION_MUTANT $(RUNTIME_TEST) 1 0 10 20 && \
+	  grep -q '^10$$' $$tmp && grep -q '^20$$' $$tmp && rm -f $$tmp
+	@echo "[  PASSED  ] runtime"
+	@echo "== mulation =="
+	$(RUNNER) --min-score 0 $(EXAMPLE)
 
 lint: $(RUNNER) $(UNIT) $(RUNTIME_TEST) tidy
 	@echo "== compiler lint (-Wall -Wextra -Wpedantic -Werror) ok =="

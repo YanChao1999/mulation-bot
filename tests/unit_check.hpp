@@ -1,6 +1,7 @@
 #ifndef MULATION_UNIT_CHECK_HPP
 #define MULATION_UNIT_CHECK_HPP
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -48,16 +49,18 @@ struct UnitAdd {
     } while (0)
 
 inline int unit_main() {
-    std::cout << "[========] " << unit_tests().size() << " tests\n";
+    const bool verbose = std::getenv("MULATION_TEST_VERBOSE") != nullptr;
     int failed = 0;
     for (const UnitTest &t : unit_tests()) {
         const int before = unit_failures();
-        std::cout << "[ RUN      ] " << t.name << "\n";
+        if (verbose) {
+            std::cout << "[ RUN      ] " << t.name << "\n";
+        }
         t.fn();
         if (unit_failures() > before) {
             std::cout << "[  FAILED  ] " << t.name << "\n";
             ++failed;
-        } else {
+        } else if (verbose) {
             std::cout << "[       OK ] " << t.name << "\n";
         }
     }
@@ -65,7 +68,7 @@ inline int unit_main() {
         std::cout << "[  FAILED  ] " << failed << " test(s)\n";
         return 1;
     }
-    std::cout << "[  PASSED  ] " << unit_tests().size() << " test(s)\n";
+    std::cout << "[  PASSED  ] " << unit_tests().size() << " tests\n";
     return 0;
 }
 

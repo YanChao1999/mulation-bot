@@ -80,7 +80,7 @@ Compile with tidy on each translation unit: `cmake -B build -DMULATION_ENABLE_CL
 
 `--min-score N` fails CI when the score is too low. `--git-diff [BASE]` only scores mutants on the PR/worktree diff.
 
-A survived mutant at `foo.cpp:42` `[ROR] >= -> >` means: add a boundary assertion that distinguishes `>=` from `>`.
+A survived mutant at `foo.cpp:42` `[ROR] >= -> >` means a test ran that region but still passed after the operator changed.
 
 ## Mutation operators (MVP)
 

@@ -428,7 +428,8 @@ int main(int argc, char **argv) {
 
     if (!opt.json_out.empty()) {
         std::ofstream js(opt.json_out);
-        js << "{\"killed\":" << killed << ",\"survived\":" << survived << ",\"timeout\":" << timeout_n
+        js << "{\"killed\":" << killed << ",\"survived\":" << survived
+           << ",\"timeout\":" << timeout_n
            << ",\"score\":" << score << ",\"survivors\":[";
         bool first = true;
         auto emit = [&](const Mutant &m) {

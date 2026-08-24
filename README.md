@@ -42,21 +42,34 @@ mulation_add_check(my_tests)     # cmake --build . --target mulation-check
 
 ## Build
 
-Requires Clang/LLVM 18 (pass plugin) and a C++17 compiler.
+Requires Clang/LLVM 18 (pass plugin) and a C++17 compiler. For format and tidy:
+
+```bash
+sudo apt install clang-format-18 clang-tidy-18
+```
 
 ```bash
 make                 # plugin, runtime, mulation-run
-make check           # example: green tests + mutation report
+make test            # unit tests for the runner and runtime
+make format          # clang-format -i
+make format-check    # clang-format --dry-run -Werror
+make tidy            # clang-tidy on runner, runtime, and tests
+make lint            # -Wall -Wextra -Wpedantic -Werror, then clang-tidy
+make check           # tests + example mutation campaign + format-check + lint
 ```
 
-With CMake (optional):
+CMake (optional):
 
 ```bash
 cmake -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
 cmake --build build
 ctest --test-dir build
+cmake --build build --target format-check
+cmake --build build --target tidy
 cmake --build build --target mulation-check
 ```
+
+Compile with tidy on each translation unit: `cmake -B build -DMULATION_ENABLE_CLANG_TIDY=ON`.
 
 ## What the report means
 
@@ -83,5 +96,9 @@ Equivalent mutants (behavior-preserving edits) can inflate “survived”; treat
 - `plugin/` — LLVM pass plugin (`-fpass-plugin=libmulation_plugin.so`)
 - `runtime/` — C ABI `mulation_active(id)`, env `MULATION_MUTANT`
 - `runner/` — `mulation` / `mulation-run` CLI
+- `tests/` — unit tests for catalog, git-diff, process, and runtime
 - `cmake/Mulation.cmake` — `mulation_instrument` / `mulation_add_check`
+- `cmake/ClangTools.cmake` — `format`, `format-check`, `tidy` CMake targets
+- `.clang-format` / `.clang-tidy` — LLVM-style format and tidy checks
+- `scripts/run-clang-format.sh` / `scripts/run-clang-tidy.sh`
 - `examples/gtest-ctest/` — green suite with a surviving boundary mutant

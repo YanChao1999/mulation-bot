@@ -8,6 +8,7 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LLVM_CONFIG "" CACHE FILEPATH "llvm-config executable")
 if(NOT LLVM_CONFIG)
@@ -38,6 +39,7 @@ set_target_properties(mulation_plugin PROPERTIES
 add_library(mulation_runtime STATIC runtime/mulation_runtime.c)
 target_include_directories(mulation_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(mulation_runtime PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(mulation_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 set(_runner_src
   runner/main.cpp
@@ -47,8 +49,10 @@ set(_runner_src
 )
 add_executable(mulation-run ${_runner_src})
 target_include_directories(mulation-run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+target_compile_options(mulation-run PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_executable(mulation ${_runner_src})
 target_include_directories(mulation PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+target_compile_options(mulation PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 include(GNUInstallDirs)
 install(TARGETS mulation_plugin LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -60,8 +64,41 @@ install(FILES cmake/Mulation.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Mul
 set(MULATION_PLUGIN_PATH "$<TARGET_FILE:mulation_plugin>" CACHE INTERNAL "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Mulation.cmake)
 
+option(MULATION_BUILD_TESTS "Build tool unit tests" ON)
 option(MULATION_BUILD_EXAMPLES "Build the gtest/CTest example" ON)
-if(MULATION_BUILD_EXAMPLES)
+if(MULATION_BUILD_TESTS OR MULATION_BUILD_EXAMPLES)
   enable_testing()
+endif()
+
+if(MULATION_BUILD_TESTS)
+  add_executable(mulation_unit_tests
+    tests/unit_main.cpp
+    tests/catalog_test.cpp
+    tests/diff_test.cpp
+    tests/process_test.cpp
+    runner/catalog.cpp
+    runner/diff.cpp
+    runner/process.cpp
+  )
+  target_include_directories(mulation_unit_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/runner
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  target_compile_options(mulation_unit_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME mulation_unit_tests COMMAND mulation_unit_tests)
+
+  add_executable(runtime_test tests/runtime_test.c)
+  target_link_libraries(runtime_test PRIVATE mulation_runtime)
+  target_compile_options(runtime_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME runtime_inactive COMMAND runtime_test 1 0)
+  set_tests_properties(runtime_inactive PROPERTIES ENVIRONMENT "MULATION_MUTANT=")
+  add_test(NAME runtime_active_match COMMAND runtime_test 42 1)
+  set_tests_properties(runtime_active_match PROPERTIES ENVIRONMENT MULATION_MUTANT=42)
+  add_test(NAME runtime_active_miss COMMAND runtime_test 7 0)
+  set_tests_properties(runtime_active_miss PROPERTIES ENVIRONMENT MULATION_MUTANT=42)
+endif()
+
+if(MULATION_BUILD_EXAMPLES)
   add_subdirectory(examples/gtest-ctest)
 endif()
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClangTools.cmake)

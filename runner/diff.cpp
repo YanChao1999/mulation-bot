@@ -33,12 +33,7 @@ static bool path_match(const std::string &mut_file, const std::string &diff_file
     return slash(mut_file) == slash(diff_file);
 }
 
-std::vector<LineRange> git_diff_ranges(const std::string &base) {
-    std::string cmd = "git diff -U0 --no-color -- ";
-    if (!base.empty() && base != "WORKING") {
-        cmd = "git diff -U0 --no-color " + base + " -- ";
-    }
-    std::string text = run_capture(cmd.c_str());
+std::vector<LineRange> parse_git_diff_text(const std::string &text) {
     std::vector<LineRange> ranges;
     std::string file;
     std::istringstream in(text);
@@ -72,6 +67,14 @@ std::vector<LineRange> git_diff_ranges(const std::string &base) {
         ranges.push_back(std::move(r));
     }
     return ranges;
+}
+
+std::vector<LineRange> git_diff_ranges(const std::string &base) {
+    std::string cmd = "git diff -U0 --no-color -- ";
+    if (!base.empty() && base != "WORKING") {
+        cmd = "git diff -U0 --no-color " + base + " -- ";
+    }
+    return parse_git_diff_text(run_capture(cmd.c_str()));
 }
 
 std::vector<Mutant> filter_by_diff(const std::vector<Mutant> &mutants,

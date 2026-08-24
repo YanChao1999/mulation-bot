@@ -372,7 +372,8 @@ private:
 
             IRBuilder<> B(insertAfterPoint(BO));
             B.SetCurrentDebugLocation(BO->getDebugLoc());
-            Value *MutV = B.CreateBinOp(mutOp, BO->getOperand(0), BO->getOperand(1), "mulation.mut");
+            Value *MutV =
+                B.CreateBinOp(mutOp, BO->getOperand(0), BO->getOperand(1), "mulation.mut");
             Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
             Value *Sel = B.CreateSelect(Cond, MutV, BO, "mulation.sel");
             BO->replaceUsesWithIf(Sel, [&](Use &U) {

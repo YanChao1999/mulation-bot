@@ -8,8 +8,8 @@
 #include <fstream>
 #include <iostream>
 #include <libgen.h>
+#include <map>
 #include <set>
-#include <sstream>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -51,6 +51,24 @@ std::string dirname_of(std::string path) {
     std::vector<char> buf(path.begin(), path.end());
     buf.push_back('\0');
     return dirname(buf.data());
+}
+
+std::string basename_of(std::string path) {
+    auto slash = path.find_last_of("/\\");
+    if (slash != std::string::npos) {
+        path = path.substr(slash + 1);
+    }
+    return path;
+}
+
+std::string executable_path(const char *argv0) {
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = '\0';
+        return std::string(buf, static_cast<std::size_t>(n));
+    }
+    return argv0 ? argv0 : "";
 }
 
 std::string join(const std::string &a, const std::string &b) {
@@ -130,11 +148,7 @@ int run_wrapper(const std::string &self, const std::string &compiler,
 }
 
 bool looks_like_compiler(const std::string &s) {
-    auto base = s;
-    auto slash = base.find_last_of("/\\");
-    if (slash != std::string::npos) {
-        base = base.substr(slash + 1);
-    }
+    auto base = basename_of(s);
     return base == "c++" || base == "cc" || base == "clang" || base == "clang++" || base == "g++" ||
            base == "gcc";
 }
@@ -144,6 +158,14 @@ std::string compiler_for(const std::string &alias) {
         return "clang++";
     }
     return "clang";
+}
+
+void require_value(int i, int argc, char **argv, const char *opt) {
+    if (i + 1 >= argc || argv[i + 1] == nullptr) {
+        std::cerr << "mulation: " << opt << " requires a value\n";
+        usage(argv[0]);
+        std::exit(2);
+    }
 }
 
 Options parse_args(int argc, char **argv) {
@@ -163,6 +185,7 @@ Options parse_args(int argc, char **argv) {
             std::exit(0);
         }
         if (a == "--min-score") {
+            require_value(i, argc, argv, "--min-score");
             o.min_score = std::atoi(argv[++i]);
             o.min_score_set = true;
             ++i;
@@ -197,6 +220,7 @@ Options parse_args(int argc, char **argv) {
             continue;
         }
         if (a == "--timeout-ms") {
+            require_value(i, argc, argv, "--timeout-ms");
             o.timeout_ms = std::atoi(argv[++i]);
             ++i;
             continue;
@@ -207,16 +231,19 @@ Options parse_args(int argc, char **argv) {
             continue;
         }
         if (a == "--catalog-dir") {
+            require_value(i, argc, argv, "--catalog-dir");
             o.catalog_dir = argv[++i];
             ++i;
             continue;
         }
         if (a == "--binary") {
+            require_value(i, argc, argv, "--binary");
             o.binaries.emplace_back(argv[++i]);
             ++i;
             continue;
         }
         if (a == "--json-out") {
+            require_value(i, argc, argv, "--json-out");
             o.json_out = argv[++i];
             ++i;
             continue;
@@ -244,6 +271,9 @@ std::string suggestion(const Mutant &m) {
     if (m.kind == "LCR") {
         return "add a case where `&&` and `||` disagree";
     }
+    if (m.kind == "BOR") {
+        return "add a case where `&` and `|` disagree";
+    }
     if (m.kind == "LVR") {
         return "cover the zero/one literal independently";
     }
@@ -269,6 +299,17 @@ bool is_elf(const std::string &path) {
     return in && mag[0] == 0x7f && mag[1] == 'E' && mag[2] == 'L' && mag[3] == 'F';
 }
 
+std::vector<std::string> discover_ctest_binaries(const std::vector<std::string> &cmd) {
+    std::vector<std::string> show = cmd;
+    show.insert(show.begin() + 1, "--show-only=json-v1");
+    std::string json;
+    RunResult rr = run_command(show, {}, 60000, &json);
+    if (rr.status != RunStatus::Pass) {
+        return {};
+    }
+    return parse_ctest_command_paths(json);
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -277,7 +318,7 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    std::string self = argv[0];
+    std::string self = executable_path(argv[0]);
     if (argc >= 2 && looks_like_compiler(argv[1])) {
         std::vector<std::string> rest;
         for (int i = 2; i < argc; ++i) {
@@ -300,6 +341,11 @@ int main(int argc, char **argv) {
         }
     };
     add_elf(opt.cmd[0]);
+    if (basename_of(opt.cmd[0]) == "ctest") {
+        for (const auto &p : discover_ctest_binaries(opt.cmd)) {
+            add_elf(p);
+        }
+    }
     for (const auto &b : opt.binaries) {
         add_elf(b);
     }
@@ -317,11 +363,21 @@ int main(int argc, char **argv) {
         std::cerr << "mulation: no mutants found. Rebuild the SUT with:\n"
                   << "  CXX=\"" << self << " c++\"  (or -fpass-plugin=libmulation_plugin.so -g)\n"
                   << "and link libmulation_runtime.a\n";
+        if (basename_of(opt.cmd[0]) == "ctest") {
+            std::cerr
+                << "For `mulation -- ctest`, test binaries are discovered via "
+                   "`ctest --show-only=json-v1`; you can also pass --binary or --catalog-dir.\n";
+        }
         return 2;
     }
 
     if (opt.git_diff) {
-        auto ranges = git_diff_ranges(opt.git_base);
+        std::vector<LineRange> ranges;
+        std::string git_err;
+        if (!git_diff_ranges(opt.git_base, ranges, &git_err)) {
+            std::cerr << "mulation: " << git_err << "\n";
+            return 2;
+        }
         mutants = filter_by_diff(mutants, ranges);
         if (mutants.empty()) {
             std::cout << "mulation: no mutants on git diff vs " << opt.git_base
@@ -350,7 +406,14 @@ int main(int argc, char **argv) {
         int fd = mkstemp(tmp);
         if (fd >= 0) {
             close(fd);
-            run_command(opt.cmd, {{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
+            RunResult cov =
+                run_command(opt.cmd, {{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
+            if (cov.status != RunStatus::Pass) {
+                std::cerr << "mulation: coverage baseline failed (exit " << cov.exit_code
+                          << "); refusing a partial hit log.\n";
+                unlink(tmp);
+                return 1;
+            }
             covered = load_hitlog(tmp);
             unlink(tmp);
         }
@@ -434,8 +497,9 @@ int main(int argc, char **argv) {
                 js << ",";
             }
             first = false;
-            js << "{\"id\":" << m.id << ",\"file\":\"" << m.file << "\",\"line\":" << m.line
-               << ",\"kind\":\"" << m.kind << "\",\"op\":\"" << m.op << "\",\"mut\":\"" << m.mut
+            js << "{\"id\":" << m.id << ",\"file\":\"" << json_escape(m.file)
+               << "\",\"line\":" << m.line << ",\"kind\":\"" << json_escape(m.kind)
+               << "\",\"op\":\"" << json_escape(m.op) << "\",\"mut\":\"" << json_escape(m.mut)
                << "\"}";
         };
         for (const Mutant &m : survivors) {

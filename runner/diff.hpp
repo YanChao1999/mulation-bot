@@ -13,7 +13,7 @@ struct LineRange {
 };
 
 std::vector<LineRange> parse_git_diff_text(const std::string &text);
-std::vector<LineRange> git_diff_ranges(const std::string &base);
+bool git_diff_ranges(const std::string &base, std::vector<LineRange> &out, std::string *error);
 std::vector<Mutant> filter_by_diff(const std::vector<Mutant> &mutants,
                                    const std::vector<LineRange> &ranges);
 

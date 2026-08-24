@@ -1,36 +1,22 @@
 #include "diff.hpp"
+#include "process.hpp"
 
-#include <cstdio>
 #include <cstdlib>
 #include <sstream>
-
-static std::string run_capture(const char *cmd) {
-    FILE *p = popen(cmd, "r");
-    if (!p) {
-        return {};
-    }
-    std::string out;
-    char buf[4096];
-    while (fgets(buf, sizeof(buf), p)) {
-        out += buf;
-    }
-    pclose(p);
-    return out;
-}
 
 static bool path_match(const std::string &mut_file, const std::string &diff_file) {
     if (mut_file == diff_file) {
         return true;
     }
-    if (mut_file.size() >= diff_file.size() &&
-        mut_file.compare(mut_file.size() - diff_file.size(), diff_file.size(), diff_file) == 0) {
-        return true;
+    if (mut_file.size() > diff_file.size()) {
+        const std::size_t off = mut_file.size() - diff_file.size();
+        const char sep = mut_file[off - 1];
+        if ((sep == '/' || sep == '\\') &&
+            mut_file.compare(off, diff_file.size(), diff_file) == 0) {
+            return true;
+        }
     }
-    auto slash = [](const std::string &s) {
-        auto p = s.find_last_of("/\\");
-        return p == std::string::npos ? s : s.substr(p + 1);
-    };
-    return slash(mut_file) == slash(diff_file);
+    return false;
 }
 
 std::vector<LineRange> parse_git_diff_text(const std::string &text) {
@@ -69,12 +55,31 @@ std::vector<LineRange> parse_git_diff_text(const std::string &text) {
     return ranges;
 }
 
-std::vector<LineRange> git_diff_ranges(const std::string &base) {
-    std::string cmd = "git diff -U0 --no-color -- ";
-    if (!base.empty() && base != "WORKING") {
-        cmd = "git diff -U0 --no-color " + base + " -- ";
+bool git_diff_ranges(const std::string &base, std::vector<LineRange> &out, std::string *error) {
+    out.clear();
+    if (!base.empty() && base != "WORKING" && base[0] == '-') {
+        if (error) {
+            *error = "revision must not look like a git option: " + base;
+        }
+        return false;
     }
-    return parse_git_diff_text(run_capture(cmd.c_str()));
+
+    std::vector<std::string> argv = {"git", "diff", "-U0", "--no-color"};
+    if (!base.empty() && base != "WORKING") {
+        argv.push_back(base);
+    }
+    argv.emplace_back("--");
+
+    std::string text;
+    RunResult rr = run_command(argv, {}, 60000, &text);
+    if (rr.status != RunStatus::Pass) {
+        if (error) {
+            *error = "git diff exited " + std::to_string(rr.exit_code) + " vs " + base;
+        }
+        return false;
+    }
+    out = parse_git_diff_text(text);
+    return true;
 }
 
 std::vector<Mutant> filter_by_diff(const std::vector<Mutant> &mutants,

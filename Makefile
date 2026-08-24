@@ -33,7 +33,7 @@ $(PLUGIN): plugin/MulationPass.cpp | $(BUILD)
 		-Wl,-rpath,$(LLVM_LIBDIR)
 
 $(BUILD)/mulation_runtime.o: runtime/mulation_runtime.c include/mulation/mulation.h | $(BUILD)
-	$(CC) -c -O2 -fPIC $(WARNFLAGS) -Werror -Iinclude $< -o $@
+	$(CC) -std=c11 -c -O2 -fPIC $(WARNFLAGS) -Werror -Iinclude $< -o $@
 
 $(RUNTIME): $(BUILD)/mulation_runtime.o
 	ar rcs $@ $<

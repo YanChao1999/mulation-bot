@@ -1,6 +1,7 @@
 #include "catalog.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -9,6 +10,89 @@
 #include <fstream>
 #include <set>
 #include <sstream>
+
+std::string json_escape(const std::string &s) {
+    std::string o;
+    o.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+        case '"':
+            o += "\\\"";
+            break;
+        case '\\':
+            o += "\\\\";
+            break;
+        case '\n':
+            o += "\\n";
+            break;
+        case '\r':
+            o += "\\r";
+            break;
+        case '\t':
+            o += "\\t";
+            break;
+        default:
+            if (c < 0x20) {
+                o += "\\u00";
+                const char *hex = "0123456789abcdef";
+                o.push_back(hex[c >> 4]);
+                o.push_back(hex[c & 0xf]);
+            } else {
+                o.push_back(static_cast<char>(c));
+            }
+        }
+    }
+    return o;
+}
+
+std::vector<std::string> parse_ctest_command_paths(const std::string &json) {
+    std::vector<std::string> paths;
+    const std::string key = "\"command\"";
+    std::size_t pos = 0;
+    while ((pos = json.find(key, pos)) != std::string::npos) {
+        std::size_t i = pos + key.size();
+        while (i < json.size() &&
+               (std::isspace(static_cast<unsigned char>(json[i])) || json[i] == ':')) {
+            ++i;
+        }
+        if (i >= json.size() || json[i] != '[') {
+            pos = i;
+            continue;
+        }
+        ++i;
+        while (i < json.size() && json[i] != ']') {
+            while (i < json.size() &&
+                   (std::isspace(static_cast<unsigned char>(json[i])) || json[i] == ',')) {
+                ++i;
+            }
+            if (i >= json.size() || json[i] == ']') {
+                break;
+            }
+            if (json[i] != '"') {
+                ++i;
+                continue;
+            }
+            ++i;
+            std::string val;
+            while (i < json.size() && json[i] != '"') {
+                if (json[i] == '\\' && i + 1 < json.size()) {
+                    val.push_back(json[i + 1]);
+                    i += 2;
+                } else {
+                    val.push_back(json[i++]);
+                }
+            }
+            if (i < json.size() && json[i] == '"') {
+                ++i;
+            }
+            if (!val.empty()) {
+                paths.push_back(std::move(val));
+            }
+        }
+        pos = i;
+    }
+    return paths;
+}
 
 static std::string json_string_field(const std::string &line, const char *key) {
     std::string pat = std::string("\"") + key + "\":\"";

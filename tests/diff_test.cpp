@@ -25,7 +25,7 @@ TEST(Diff, ParseSkipsZeroCount) {
     CHECK(ranges.empty());
 }
 
-TEST(Diff, FilterByLineAndBasename) {
+TEST(Diff, FilterByLineAndPathSuffix) {
     Mutant in_range{1, "/home/me/src/foo.cpp", 11, 0, "ROR", ">=", ">"};
     Mutant out_of_range{2, "/home/me/src/foo.cpp", 99, 0, "ROR", ">", ">="};
     Mutant other_file{3, "/home/me/src/bar.cpp", 11, 0, "AOR", "+", "-"};
@@ -40,4 +40,34 @@ TEST(Diff, FilterExactPath) {
     LineRange r{"src/foo.cpp", 5, 5};
     auto kept = filter_by_diff({m}, {r});
     CHECK_EQ(kept.size(), 1u);
+}
+
+TEST(Diff, FilterIgnoresUnrelatedSameBasename) {
+    Mutant other{3, "/home/me/other/foo.cpp", 11, 0, "AOR", "+", "-"};
+    LineRange r{"src/foo.cpp", 11, 12};
+    auto kept = filter_by_diff({other}, {r});
+    CHECK(kept.empty());
+}
+
+TEST(Diff, FilterRequiresDirectoryBoundary) {
+    Mutant not_foo{4, "/home/me/src/notfoo.cpp", 11, 0, "ROR", ">=", ">"};
+    LineRange r{"foo.cpp", 11, 12};
+    auto kept = filter_by_diff({not_foo}, {r});
+    CHECK(kept.empty());
+}
+
+TEST(Diff, GitDiffRejectsOptionLikeRevision) {
+    std::vector<LineRange> ranges;
+    std::string err;
+    CHECK(!git_diff_ranges("-c", ranges, &err));
+    CHECK(ranges.empty());
+    CHECK(!err.empty());
+}
+
+TEST(Diff, GitDiffFailsClosedOnUnknownRevision) {
+    std::vector<LineRange> ranges;
+    std::string err;
+    CHECK(!git_diff_ranges("this-revision-does-not-exist-mulation", ranges, &err));
+    CHECK(ranges.empty());
+    CHECK(!err.empty());
 }

@@ -7,6 +7,22 @@
 #include <unistd.h>
 #include <vector>
 
+TEST(Catalog, JsonEscapeQuotesAndControls) {
+    CHECK_EQ(json_escape("a\"b\\c"), std::string("a\\\"b\\\\c"));
+    CHECK_EQ(json_escape("x\ny\tz"), std::string("x\\ny\\tz"));
+}
+
+TEST(Catalog, ParseCTestCommandPaths) {
+    const char *json =
+        "{\"tests\":[{\"name\":\"t\",\"command\":[\"/tmp/foo_tests\",\"--gtest_filter=*\"]},"
+        "{\"command\" : [ \"/tmp/bar_tests\" ]}]}";
+    auto paths = parse_ctest_command_paths(json);
+    CHECK_EQ(paths.size(), 3u);
+    CHECK_EQ(paths[0], std::string("/tmp/foo_tests"));
+    CHECK_EQ(paths[1], std::string("--gtest_filter=*"));
+    CHECK_EQ(paths[2], std::string("/tmp/bar_tests"));
+}
+
 TEST(Catalog, ParseOneRecord) {
     auto ms =
         parse_ndjson("{\"id\":42,\"file\":\"src/foo.cpp\",\"line\":10,\"col\":3,\"kind\":\"ROR\","

@@ -15,6 +15,8 @@ struct Mutant {
     std::string mut;
 };
 
+std::string json_escape(const std::string &s);
+std::vector<std::string> parse_ctest_command_paths(const std::string &json);
 std::vector<Mutant> parse_ndjson(const std::string &text);
 std::vector<Mutant> read_elf_catalog(const std::string &binary);
 std::vector<Mutant> read_catalog_dir(const std::string &dir);

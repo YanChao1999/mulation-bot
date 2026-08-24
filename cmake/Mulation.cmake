@@ -10,8 +10,9 @@ if(NOT DEFINED MULATION_PLUGIN_PATH)
   if(TARGET mulation_plugin)
     set(MULATION_PLUGIN_PATH "$<TARGET_FILE:mulation_plugin>")
   else()
-    get_filename_component(_mulation_cmake_dir "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
-    set(MULATION_PLUGIN_PATH "${_mulation_cmake_dir}/../lib/libmulation_plugin.so")
+    # Installed at <libdir>/cmake/Mulation/Mulation.cmake; plugin lives in <libdir>.
+    get_filename_component(_mulation_libdir "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+    set(MULATION_PLUGIN_PATH "${_mulation_libdir}/libmulation_plugin.so")
   endif()
 endif()
 
@@ -19,7 +20,27 @@ if(NOT DEFINED MULATION_RUNTIME_TARGET)
   if(TARGET mulation_runtime)
     set(MULATION_RUNTIME_TARGET mulation_runtime)
   else()
-    set(MULATION_RUNTIME_TARGET mulation_runtime)
+    get_filename_component(_mulation_libdir "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+    set(_mulation_incdir "")
+    foreach(_cand
+        "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+        "${CMAKE_CURRENT_LIST_DIR}/../../../../include"
+        "${_mulation_libdir}/../include")
+      if(EXISTS "${_cand}/mulation/mulation.h")
+        get_filename_component(_mulation_incdir "${_cand}" ABSOLUTE)
+        break()
+      endif()
+    endforeach()
+    if(NOT TARGET mulation::runtime)
+      add_library(mulation::runtime STATIC IMPORTED GLOBAL)
+      set_target_properties(mulation::runtime PROPERTIES
+        IMPORTED_LOCATION "${_mulation_libdir}/libmulation_runtime.a")
+      if(_mulation_incdir)
+        set_target_properties(mulation::runtime PROPERTIES
+          INTERFACE_INCLUDE_DIRECTORIES "${_mulation_incdir}")
+      endif()
+    endif()
+    set(MULATION_RUNTIME_TARGET mulation::runtime)
   endif()
 endif()
 

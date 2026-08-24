@@ -14,6 +14,7 @@ struct RunResult {
 };
 
 RunResult run_command(const std::vector<std::string> &argv,
-                      const std::map<std::string, std::string> &extra_env, int timeout_ms);
+                      const std::map<std::string, std::string> &extra_env, int timeout_ms,
+                      std::string *stdout_out = nullptr);
 
 #endif

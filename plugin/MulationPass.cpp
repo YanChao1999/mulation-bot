@@ -193,7 +193,8 @@ static bool pairPred(CmpInst::Predicate P, CmpInst::Predicate &Out) {
     }
 }
 
-static const char *binName(Instruction::BinaryOps Op) {
+static const char *binName(Instruction::BinaryOps Op, Type *Ty) {
+    const bool i1 = Ty && Ty->isIntegerTy(1);
     switch (Op) {
     case Instruction::Add:
         return "+";
@@ -210,15 +211,16 @@ static const char *binName(Instruction::BinaryOps Op) {
     case Instruction::URem:
         return "%";
     case Instruction::And:
-        return "&&";
+        return i1 ? "&&" : "&";
     case Instruction::Or:
-        return "||";
+        return i1 ? "||" : "|";
     default:
         return "?";
     }
 }
 
-static bool pairBin(Instruction::BinaryOps Op, Instruction::BinaryOps &Out, const char *&Kind) {
+static bool pairBin(Instruction::BinaryOps Op, Type *Ty, Instruction::BinaryOps &Out,
+                    const char *&Kind) {
     switch (Op) {
     case Instruction::Add:
         Out = Instruction::Sub;
@@ -250,11 +252,11 @@ static bool pairBin(Instruction::BinaryOps Op, Instruction::BinaryOps &Out, cons
         return true;
     case Instruction::And:
         Out = Instruction::Or;
-        Kind = "LCR";
+        Kind = (Ty && Ty->isIntegerTy(1)) ? "LCR" : "BOR";
         return true;
     case Instruction::Or:
         Out = Instruction::And;
-        Kind = "LCR";
+        Kind = (Ty && Ty->isIntegerTy(1)) ? "LCR" : "BOR";
         return true;
     default:
         return false;
@@ -286,10 +288,31 @@ static MutantRec makeRec(uint32_t id, const std::string &file, unsigned line, un
     return r;
 }
 
-static uint32_t idFor(const std::string &file, unsigned line, unsigned col, const char *kind,
-                      const char *op, const char *mut) {
-    std::string key = file + ":" + std::to_string(line) + ":" + std::to_string(col) + ":" + kind +
-                      ":" + op + ":" + mut;
+static unsigned instOrdinal(const Instruction *I) {
+    unsigned n = 0;
+    const Function *F = I->getFunction();
+    if (!F) {
+        return 0;
+    }
+    for (const BasicBlock &BB : *F) {
+        for (const Instruction &II : BB) {
+            if (&II == I) {
+                return n;
+            }
+            ++n;
+        }
+    }
+    return n;
+}
+
+static uint32_t idFor(const Instruction *I, const std::string &file, unsigned line, unsigned col,
+                      const char *kind, const char *op, const char *mut) {
+    std::string fn;
+    if (const Function *F = I->getFunction()) {
+        fn = F->getName().str();
+    }
+    std::string key = file + ":" + std::to_string(line) + ":" + std::to_string(col) + ":" + fn +
+                      ":" + std::to_string(instOrdinal(I)) + ":" + kind + ":" + op + ":" + mut;
     return fnv1a(key);
 }
 
@@ -356,7 +379,7 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
         for (BinaryOperator *BO : bins) {
             Instruction::BinaryOps mutOp;
             const char *kind = nullptr;
-            if (!pairBin(BO->getOpcode(), mutOp, kind)) {
+            if (!pairBin(BO->getOpcode(), BO->getType(), mutOp, kind)) {
                 continue;
             }
             std::string file;
@@ -364,9 +387,9 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
             if (!locOf(BO, file, line, col)) {
                 continue;
             }
-            const char *opN = binName(BO->getOpcode());
-            const char *mutN = binName(mutOp);
-            uint32_t id = idFor(file, line, col, kind, opN, mutN);
+            const char *opN = binName(BO->getOpcode(), BO->getType());
+            const char *mutN = binName(mutOp, BO->getType());
+            uint32_t id = idFor(BO, file, line, col, kind, opN, mutN);
 
             IRBuilder<> B(insertAfterPoint(BO));
             B.SetCurrentDebugLocation(BO->getDebugLoc());
@@ -392,7 +415,7 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
             }
             const char *opN = predName(IC->getPredicate());
             const char *mutN = predName(mutP);
-            uint32_t id = idFor(file, line, col, "ROR", opN, mutN);
+            uint32_t id = idFor(IC, file, line, col, "ROR", opN, mutN);
 
             IRBuilder<> B(insertAfterPoint(IC));
             B.SetCurrentDebugLocation(IC->getDebugLoc());
@@ -418,7 +441,7 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
             const bool isZero = C->isZero();
             const char *opN = isZero ? "0" : "1";
             const char *mutN = isZero ? "1" : "0";
-            uint32_t id = idFor(file, line, col, "LVR", opN, mutN);
+            uint32_t id = idFor(I, file, line, col, "LVR", opN, mutN);
 
             IRBuilder<> B(I);
             B.SetCurrentDebugLocation(I->getDebugLoc());

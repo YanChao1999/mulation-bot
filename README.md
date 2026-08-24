@@ -19,7 +19,7 @@ Coverage says a line **ran**. Mutation says: if that line were **faulty**, a tes
 ```bash
 valgrind --leak-check=full ./my_gtest
 mulation --min-score 80 ./my_gtest
-mulation -- ctest
+mulation -- ctest                 # discovers test ELFs via `ctest --show-only=json-v1`
 ```
 
 You keep writing Google Test (or any CTest binary that exits 0 on pass). Mulation instruments **product code only**, never test files.
@@ -86,8 +86,8 @@ A survived mutant at `foo.cpp:42` `[ROR] >= -> >` means: add a boundary assertio
 
 - **AOR** arithmetic: `+`/`-`, `*`/`/`, `%`
 - **ROR** relational: `<`/`<=`/`>`/`>=`/`==`/`!=`
-- **LCR** logical: `&&`/`||`
-- **LVR** literals: `0`↔`1` on compares and returns
+- **BOR** bitwise: `&`/`|` (LLVM `and`/`or` on integer widths other than i1)
+- **LCR** logical: `&&`/`||` (i1 `and`/`or`; source `&&`/`||` is often control flow and may not appear)
 
 Equivalent mutants (behavior-preserving edits) can inflate “survived”; treat them as test debt for now.
 

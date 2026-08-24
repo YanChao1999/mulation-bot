@@ -1,5 +1,6 @@
 #include "mulation/mulation.h"
 
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,8 +12,8 @@ static char g_hitlog_path[1024];
 
 enum { HIT_CAP = 1 << 16 };
 
-static unsigned g_hit_slots[HIT_CAP];
-static unsigned g_hit_count;
+static atomic_uint g_hit_slots[HIT_CAP];
+static atomic_uint g_hit_count;
 
 static unsigned hit_hash(unsigned id) {
     id ^= id >> 16;
@@ -28,12 +29,12 @@ static void record_hit(unsigned id) {
     unsigned slot = hit_hash(id) & (HIT_CAP - 1);
     for (unsigned n = 0; n < 16; ++n) {
         unsigned i = (slot + n) & (HIT_CAP - 1);
-        if (g_hit_slots[i] == 0) {
-            g_hit_slots[i] = id;
-            ++g_hit_count;
+        unsigned expected = 0;
+        if (atomic_compare_exchange_strong(&g_hit_slots[i], &expected, id)) {
+            atomic_fetch_add_explicit(&g_hit_count, 1u, memory_order_relaxed);
             return;
         }
-        if (g_hit_slots[i] == id) {
+        if (expected == id) {
             return;
         }
     }
@@ -48,8 +49,9 @@ static void mulation_flush_hits(void) {
         return;
     }
     for (unsigned i = 0; i < HIT_CAP; ++i) {
-        if (g_hit_slots[i] != 0) {
-            fprintf(f, "%u\n", g_hit_slots[i]);
+        unsigned id = atomic_load_explicit(&g_hit_slots[i], memory_order_relaxed);
+        if (id != 0) {
+            fprintf(f, "%u\n", id);
         }
     }
     fclose(f);

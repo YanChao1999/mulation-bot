@@ -55,17 +55,16 @@ RunResult run_command(const std::vector<std::string> &argv,
             waitpid(pid, &status, 0);
             r.status = RunStatus::Timeout;
             r.exit_code = 124;
-            r.duration_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                 clock::now() - start)
-                                                 .count());
+            r.duration_ms = static_cast<int>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start)
+                    .count());
             return r;
         }
         usleep(5000);
     }
 
     r.duration_ms = static_cast<int>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start)
-            .count());
+        std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start).count());
     if (WIFEXITED(status)) {
         r.exit_code = WEXITSTATUS(status);
         r.status = (r.exit_code == 0) ? RunStatus::Pass : RunStatus::Fail;

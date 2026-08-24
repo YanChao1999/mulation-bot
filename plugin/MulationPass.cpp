@@ -89,8 +89,7 @@ static bool skipPath(StringRef p) {
         return true;
     }
     if (lower.find("/usr/include/") != std::string::npos ||
-        lower.find("/usr/lib/") != std::string::npos ||
-        lower.find("/bits/") != std::string::npos) {
+        lower.find("/usr/lib/") != std::string::npos || lower.find("/bits/") != std::string::npos) {
         return true;
     }
     return false;
@@ -264,8 +263,7 @@ static bool pairBin(Instruction::BinaryOps Op, Instruction::BinaryOps &Out, cons
 
 static FunctionCallee getActiveFn(Module &M) {
     LLVMContext &Ctx = M.getContext();
-    FunctionType *FT =
-        FunctionType::get(Type::getInt1Ty(Ctx), {Type::getInt32Ty(Ctx)}, false);
+    FunctionType *FT = FunctionType::get(Type::getInt1Ty(Ctx), {Type::getInt32Ty(Ctx)}, false);
     FunctionCallee C = M.getOrInsertFunction("mulation_active", FT);
     if (Function *F = dyn_cast<Function>(C.getCallee())) {
         F->setDoesNotThrow();
@@ -290,8 +288,8 @@ static MutantRec makeRec(uint32_t id, const std::string &file, unsigned line, un
 
 static uint32_t idFor(const std::string &file, unsigned line, unsigned col, const char *kind,
                       const char *op, const char *mut) {
-    std::string key = file + ":" + std::to_string(line) + ":" + std::to_string(col) + ":" +
-                      kind + ":" + op + ":" + mut;
+    std::string key = file + ":" + std::to_string(line) + ":" + std::to_string(col) + ":" + kind +
+                      ":" + op + ":" + mut;
     return fnv1a(key);
 }
 
@@ -303,7 +301,7 @@ static Instruction *insertAfterPoint(Instruction *I) {
 }
 
 class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
-public:
+  public:
     static bool isRequired() { return true; }
 
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
@@ -313,7 +311,7 @@ public:
         return PreservedAnalyses::all();
     }
 
-private:
+  private:
     bool instrument(Module &M) {
         std::vector<BinaryOperator *> bins;
         std::vector<ICmpInst *> cmps;
@@ -376,9 +374,8 @@ private:
                 B.CreateBinOp(mutOp, BO->getOperand(0), BO->getOperand(1), "mulation.mut");
             Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
             Value *Sel = B.CreateSelect(Cond, MutV, BO, "mulation.sel");
-            BO->replaceUsesWithIf(Sel, [&](Use &U) {
-                return U.getUser() != MutV && U.getUser() != Sel;
-            });
+            BO->replaceUsesWithIf(
+                Sel, [&](Use &U) { return U.getUser() != MutV && U.getUser() != Sel; });
             recs.push_back(makeRec(id, file, line, col, kind, opN, mutN));
             changed = true;
         }
@@ -399,13 +396,11 @@ private:
 
             IRBuilder<> B(insertAfterPoint(IC));
             B.SetCurrentDebugLocation(IC->getDebugLoc());
-            Value *MutV =
-                B.CreateICmp(mutP, IC->getOperand(0), IC->getOperand(1), "mulation.mut");
+            Value *MutV = B.CreateICmp(mutP, IC->getOperand(0), IC->getOperand(1), "mulation.mut");
             Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
             Value *Sel = B.CreateSelect(Cond, MutV, IC, "mulation.sel");
-            IC->replaceUsesWithIf(Sel, [&](Use &U) {
-                return U.getUser() != MutV && U.getUser() != Sel;
-            });
+            IC->replaceUsesWithIf(
+                Sel, [&](Use &U) { return U.getUser() != MutV && U.getUser() != Sel; });
             recs.push_back(makeRec(id, file, line, col, "ROR", opN, mutN));
             changed = true;
         }
@@ -427,8 +422,8 @@ private:
 
             IRBuilder<> B(I);
             B.SetCurrentDebugLocation(I->getDebugLoc());
-            Value *MutC = isZero ? ConstantInt::get(C->getType(), 1)
-                                 : ConstantInt::get(C->getType(), 0);
+            Value *MutC =
+                isZero ? ConstantInt::get(C->getType(), 1) : ConstantInt::get(C->getType(), 0);
             Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
             Value *Sel = B.CreateSelect(Cond, MutC, C, "mulation.sel");
             I->setOperand(oi, Sel);
@@ -502,18 +497,16 @@ private:
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
     return {LLVM_PLUGIN_API_VERSION, "mulation", "0.1.0", [](PassBuilder &PB) {
-                PB.registerPipelineStartEPCallback(
-                    [](ModulePassManager &MPM, OptimizationLevel) {
+                PB.registerPipelineStartEPCallback([](ModulePassManager &MPM, OptimizationLevel) {
+                    MPM.addPass(MulationInstrumentPass());
+                });
+                PB.registerPipelineParsingCallback([](StringRef Name, ModulePassManager &MPM,
+                                                      ArrayRef<PassBuilder::PipelineElement>) {
+                    if (Name == "mulation") {
                         MPM.addPass(MulationInstrumentPass());
-                    });
-                PB.registerPipelineParsingCallback(
-                    [](StringRef Name, ModulePassManager &MPM,
-                       ArrayRef<PassBuilder::PipelineElement>) {
-                        if (Name == "mulation") {
-                            MPM.addPass(MulationInstrumentPass());
-                            return true;
-                        }
-                        return false;
-                    });
+                        return true;
+                    }
+                    return false;
+                });
             }};
 }

@@ -61,7 +61,7 @@ $(BUILD)/compare_test.o: examples/gtest-ctest/tests/compare_test.cpp \
 $(EXAMPLE): $(BUILD)/compare.o $(BUILD)/compare_test.o $(RUNTIME)
 	clang++ $^ -o $@
 
-example: $(EXAMPLE)
+example: $(EXAMPLE) $(RUNNER)
 
 test: $(UNIT) $(RUNTIME_TEST)
 	@echo "== tool unit tests =="

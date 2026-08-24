@@ -36,7 +36,7 @@ jobs:
       - name: Build, test, mutation example
         run: |
           make test example
-          ./build/mulation-run --min-score 0 ./build/compare_tests
+          $(pwd)/build/mulation-run --min-score 0 ./build/compare_tests
         env:
           CXX: clang++-18
           CC: clang-18

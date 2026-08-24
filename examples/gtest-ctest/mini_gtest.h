@@ -71,7 +71,9 @@ inline int mini_gtest_main() {
 }
 
 #ifndef MINI_GTEST_NO_MAIN
-int main() { return mini_gtest_main(); }
+int main() {
+    return mini_gtest_main();
+}
 #endif
 
 #endif

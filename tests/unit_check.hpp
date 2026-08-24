@@ -32,7 +32,7 @@ struct UnitAdd {
 #define CHECK(cond)                                                                                \
     do {                                                                                           \
         if (!(cond)) {                                                                             \
-            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK failed: " #cond "\n";              \
+            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK failed: " #cond "\n";             \
             ++unit_failures();                                                                     \
         }                                                                                          \
     } while (0)
@@ -42,7 +42,7 @@ struct UnitAdd {
         const auto _ea = (a);                                                                      \
         const auto _eb = (b);                                                                      \
         if (!((_ea) == (_eb))) {                                                                   \
-            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK_EQ failed: " #a " vs " #b "\n";    \
+            std::cerr << __FILE__ << ":" << __LINE__ << ": CHECK_EQ failed: " #a " vs " #b "\n";   \
             ++unit_failures();                                                                     \
         }                                                                                          \
     } while (0)

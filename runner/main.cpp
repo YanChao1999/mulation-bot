@@ -30,22 +30,21 @@ struct Options {
 };
 
 void usage(const char *argv0) {
-    std::cerr
-        << "mulation — mutation layer on Google Test / CTest\n"
-        << "Usage:\n"
-        << "  " << argv0 << " [options] [--] <test-binary> [args...]\n"
-        << "  " << argv0 << " [options] -- ctest [ctest-args...]\n"
-        << "  " << argv0 << " c++ [clang++-args...]     (compiler wrapper)\n"
-        << "  " << argv0 << " cc  [clang-args...]       (compiler wrapper)\n"
-        << "\nOptions:\n"
-        << "  --min-score N       Fail if kill rate is below N percent (CI gate)\n"
-        << "  --git-diff [BASE]   Only mutants on lines changed vs BASE (default HEAD)\n"
-        << "  --timeout-ms N      Per-mutant timeout (default: 5x baseline + 1000ms)\n"
-        << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
-        << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
-        << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
-        << "  --json-out FILE     Write machine-readable report\n"
-        << "  -h, --help          Show this help\n";
+    std::cerr << "mulation — mutation layer on Google Test / CTest\n"
+              << "Usage:\n"
+              << "  " << argv0 << " [options] [--] <test-binary> [args...]\n"
+              << "  " << argv0 << " [options] -- ctest [ctest-args...]\n"
+              << "  " << argv0 << " c++ [clang++-args...]     (compiler wrapper)\n"
+              << "  " << argv0 << " cc  [clang-args...]       (compiler wrapper)\n"
+              << "\nOptions:\n"
+              << "  --min-score N       Fail if kill rate is below N percent (CI gate)\n"
+              << "  --git-diff [BASE]   Only mutants on lines changed vs BASE (default HEAD)\n"
+              << "  --timeout-ms N      Per-mutant timeout (default: 5x baseline + 1000ms)\n"
+              << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
+              << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
+              << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
+              << "  --json-out FILE     Write machine-readable report\n"
+              << "  -h, --help          Show this help\n";
 }
 
 std::string dirname_of(std::string path) {
@@ -136,8 +135,8 @@ bool looks_like_compiler(const std::string &s) {
     if (slash != std::string::npos) {
         base = base.substr(slash + 1);
     }
-    return base == "c++" || base == "cc" || base == "clang" || base == "clang++" ||
-           base == "g++" || base == "gcc";
+    return base == "c++" || base == "cc" || base == "clang" || base == "clang++" || base == "g++" ||
+           base == "gcc";
 }
 
 std::string compiler_for(const std::string &alias) {
@@ -411,8 +410,8 @@ int main(int argc, char **argv) {
     if (!survivors.empty() || !uncovered.empty()) {
         std::cout << "\nSurvived (tests would miss this bug in production):\n";
         auto dump = [](const Mutant &m, const char *tag) {
-            std::cout << "  " << m.file << ":" << m.line << ":" << m.col << "  [" << m.kind
-                      << "] `" << m.op << "` -> `" << m.mut << "`";
+            std::cout << "  " << m.file << ":" << m.line << ":" << m.col << "  [" << m.kind << "] `"
+                      << m.op << "` -> `" << m.mut << "`";
             if (tag) {
                 std::cout << "  " << tag;
             }
@@ -429,8 +428,7 @@ int main(int argc, char **argv) {
     if (!opt.json_out.empty()) {
         std::ofstream js(opt.json_out);
         js << "{\"killed\":" << killed << ",\"survived\":" << survived
-           << ",\"timeout\":" << timeout_n
-           << ",\"score\":" << score << ",\"survivors\":[";
+           << ",\"timeout\":" << timeout_n << ",\"score\":" << score << ",\"survivors\":[";
         bool first = true;
         auto emit = [&](const Mutant &m) {
             if (!first) {

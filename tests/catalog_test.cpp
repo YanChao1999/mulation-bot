@@ -8,9 +8,9 @@
 #include <vector>
 
 TEST(Catalog, ParseOneRecord) {
-    auto ms = parse_ndjson(
-        "{\"id\":42,\"file\":\"src/foo.cpp\",\"line\":10,\"col\":3,\"kind\":\"ROR\","
-        "\"op\":\">=\",\"mut\":\">\"}\n");
+    auto ms =
+        parse_ndjson("{\"id\":42,\"file\":\"src/foo.cpp\",\"line\":10,\"col\":3,\"kind\":\"ROR\","
+                     "\"op\":\">=\",\"mut\":\">\"}\n");
     CHECK_EQ(ms.size(), 1u);
     CHECK_EQ(ms[0].id, 42u);
     CHECK_EQ(ms[0].file, std::string("src/foo.cpp"));
@@ -30,9 +30,9 @@ TEST(Catalog, ParseSkipsGarbageAndEmpty) {
 }
 
 TEST(Catalog, ParseEscapedPath) {
-    auto ms = parse_ndjson(
-        "{\"id\":1,\"file\":\"dir\\\\foo.cpp\",\"line\":1,\"col\":0,\"kind\":\"LVR\","
-        "\"op\":\"0\",\"mut\":\"1\"}\n");
+    auto ms =
+        parse_ndjson("{\"id\":1,\"file\":\"dir\\\\foo.cpp\",\"line\":1,\"col\":0,\"kind\":\"LVR\","
+                     "\"op\":\"0\",\"mut\":\"1\"}\n");
     CHECK_EQ(ms.size(), 1u);
     CHECK_EQ(ms[0].file, std::string("dir\\foo.cpp"));
 }

@@ -10,12 +10,18 @@
 
 #include "compare.h"
 
-TEST(Adult, TwentyIsAdult) { EXPECT_TRUE(is_adult(20)); }
+TEST(Adult, TwentyIsAdult) {
+    EXPECT_TRUE(is_adult(20));
+}
 
-TEST(Max, Unequal) { EXPECT_EQ(max2(5, 3), 5); }
+TEST(Max, Unequal) {
+    EXPECT_EQ(max2(5, 3), 5);
+}
 
 /* Strong enough to kill `+` -> `-`. */
-TEST(Add, TwoPlusTwo) { EXPECT_EQ(add2(2, 2), 4); }
+TEST(Add, TwoPlusTwo) {
+    EXPECT_EQ(add2(2, 2), 4);
+}
 
 /*
  * Uncomment to kill the surviving `>=` -> `>` mutant:

@@ -50,12 +50,12 @@ sudo apt install clang-format-18 clang-tidy-18
 
 ```bash
 make                 # plugin, runtime, mulation-run
-make test            # unit tests for the runner and runtime
+make test            # runner units, runtime, then `mulation-run` on a test binary
 make format          # clang-format -i
 make format-check    # clang-format --dry-run -Werror
 make tidy            # clang-tidy on runner, runtime, and tests
 make lint            # -Wall -Wextra -Wpedantic -Werror, then clang-tidy
-make check           # tests + example mutation campaign + format-check + lint
+make check           # make test + format-check + lint
 ```
 
 CMake (optional):

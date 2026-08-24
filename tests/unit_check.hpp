@@ -48,6 +48,7 @@ struct UnitAdd {
     } while (0)
 
 inline int unit_main() {
+    std::cout << "[========] " << unit_tests().size() << " tests\n";
     int failed = 0;
     for (const UnitTest &t : unit_tests()) {
         const int before = unit_failures();

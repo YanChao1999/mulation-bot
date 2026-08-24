@@ -63,17 +63,8 @@ $(EXAMPLE): $(BUILD)/compare.o $(BUILD)/compare_test.o $(RUNTIME)
 
 example: $(EXAMPLE) $(RUNNER)
 
-test: $(UNIT) $(RUNTIME_TEST)
-	@echo "== tool unit tests =="
-	$(UNIT)
-	@echo "== runtime (env switch) =="
-	env -u MULATION_MUTANT $(RUNTIME_TEST) 1 0
-	MULATION_MUTANT=42 $(RUNTIME_TEST) 42 1
-	MULATION_MUTANT=42 $(RUNTIME_TEST) 7 0
-	@tmp=$$(mktemp); \
-	  MULATION_HITLOG=$$tmp env -u MULATION_MUTANT $(RUNTIME_TEST) 1 0 10 20; \
-	  grep -q '^10$$' $$tmp && grep -q '^20$$' $$tmp; \
-	  rm -f $$tmp
+test: $(UNIT) $(RUNTIME_TEST) example
+	sh scripts/run-tests.sh $(EXAMPLE)
 
 lint: $(RUNNER) $(UNIT) $(RUNTIME_TEST) tidy
 	@echo "== compiler lint (-Wall -Wextra -Wpedantic -Werror) ok =="
@@ -87,11 +78,8 @@ format:
 format-check:
 	sh scripts/run-clang-format.sh --check
 
-check: test example $(RUNNER) format-check lint
-	@echo "== example unit tests (must pass) =="
-	$(EXAMPLE)
-	@echo "== mutation campaign =="
-	$(RUNNER) --min-score 0 $(EXAMPLE)
+check: test format-check lint
+	@echo "== make check: tests + format + tidy ok =="
 
 clean:
 	rm -rf $(BUILD)

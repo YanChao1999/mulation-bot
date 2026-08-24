@@ -34,9 +34,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y clang-18 llvm-18-dev
       - name: Build, test, mutation example
-        run: |
-          make test example
-          $(pwd)/build/mulation-run --min-score 0 ./build/compare_tests
+        run: make test
         env:
           CXX: clang++-18
           CC: clang-18

@@ -2,11 +2,12 @@ name: pages
 
 on:
   push:
-    branches: [main, cursor/mutation-layer-on-gtest-ctest]
+    branches: [main]
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"
       - "README.md"
+  # Allow a one-off publish from the feature branch until it merges to main.
   workflow_dispatch:
 
 permissions:
@@ -27,7 +28,6 @@ jobs:
         run: |
           mkdir -p _site
           cp -a docs/. _site/
-          # Keep README available for “view source” style deep-links if needed later.
           cp README.md _site/README.md
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

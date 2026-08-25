@@ -88,8 +88,12 @@ static bool skipPath(StringRef p) {
         p.ends_with("_test.cxx") || p.ends_with("Test.cpp") || p.ends_with("_test.C")) {
         return true;
     }
+    // System / toolchain headers (paths may be relative via ../ from clang).
     if (lower.find("/usr/include/") != std::string::npos ||
-        lower.find("/usr/lib/") != std::string::npos || lower.find("/bits/") != std::string::npos) {
+        lower.find("/usr/lib/") != std::string::npos || lower.find("/bits/") != std::string::npos ||
+        lower.find("/lib/gcc/") != std::string::npos || lower.find("include/c++/") != std::string::npos ||
+        lower.find("include/c++\\") != std::string::npos ||
+        lower.find("/libc++/") != std::string::npos) {
         return true;
     }
     return false;

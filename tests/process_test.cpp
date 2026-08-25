@@ -25,6 +25,13 @@ TEST(Process, TimeoutKillsProcessGroup) {
     CHECK_EQ(r.exit_code, 124);
 }
 
+TEST(Process, ExtraEnvIsVisible) {
+    std::string out;
+    RunResult r = run_command({"/usr/bin/env"}, {{"MULATION_SMOKE", "visible"}}, 2000, &out);
+    CHECK_EQ(static_cast<int>(r.status), static_cast<int>(RunStatus::Pass));
+    CHECK(out.find("MULATION_SMOKE=visible") != std::string::npos);
+}
+
 TEST(Process, CaptureStdout) {
     std::string out;
     RunResult r = run_command({"/bin/echo", "hello"}, {}, 2000, &out);

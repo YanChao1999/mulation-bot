@@ -16,9 +16,10 @@ PLUGIN_CXX := clang++
 LLVM_LIBDIR := $(shell $(LLVM_CONFIG) --libdir)
 
 PLUGIN_CXXFLAGS := $(shell $(LLVM_CONFIG) --cxxflags) -fPIC -fno-rtti
-RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.cpp
+RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.cpp runner/cli.cpp
 UNIT_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp tests/process_test.cpp \
-	runner/catalog.cpp runner/diff.cpp runner/process.cpp
+	tests/cli_test.cpp tests/elf_catalog_test.cpp \
+	runner/catalog.cpp runner/diff.cpp runner/process.cpp runner/cli.cpp
 
 .PHONY: all example test lint tidy format format-check check clean install install-smoke package
 
@@ -38,13 +39,13 @@ $(BUILD)/mulation_runtime.o: runtime/mulation_runtime.c include/mulation/mulatio
 $(RUNTIME): $(BUILD)/mulation_runtime.o
 	ar rcs $@ $<
 
-$(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp | $(BUILD)
+$(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp | $(BUILD)
 	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -Irunner $(RUNNER_SRC) -o $@
 
 $(MULATION): $(RUNNER)
 	ln -sfn mulation-run $@
 
-$(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp | $(BUILD)
+$(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp runner/cli.hpp | $(BUILD)
 	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -Irunner -Itests $(UNIT_SRC) -o $@
 
 $(RUNTIME_TEST): tests/runtime_test.c $(RUNTIME) include/mulation/mulation.h | $(BUILD)
@@ -74,8 +75,12 @@ test: $(UNIT) $(RUNTIME_TEST) example
 	  MULATION_HITLOG=$$tmp env -u MULATION_MUTANT $(RUNTIME_TEST) 1 0 10 20 && \
 	  grep -q '^10$$' $$tmp && grep -q '^20$$' $$tmp && rm -f $$tmp
 	@echo "[  PASSED  ] runtime"
+	@echo "== elf catalog =="
+	@MULATION_TEST_ELF=$(EXAMPLE) $(UNIT)
 	@echo "== mulation =="
 	$(RUNNER) --min-score 0 $(EXAMPLE)
+	@echo "== cli smoke =="
+	sh scripts/run-cli-tests.sh $(RUNNER) $(EXAMPLE)
 
 lint: $(RUNNER) $(UNIT) $(RUNTIME_TEST) tidy
 	@echo "== compiler lint (-Wall -Wextra -Wpedantic -Werror) ok =="

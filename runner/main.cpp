@@ -1,4 +1,5 @@
 #include "catalog.hpp"
+#include "cli.hpp"
 #include "diff.hpp"
 #include "process.hpp"
 
@@ -15,37 +16,6 @@
 #include <vector>
 
 namespace {
-
-struct Options {
-    int min_score = 0;
-    bool min_score_set = false;
-    bool git_diff = false;
-    std::string git_base = "HEAD";
-    int timeout_ms = 0;
-    bool no_coverage = false;
-    std::string catalog_dir;
-    std::string json_out;
-    std::vector<std::string> binaries;
-    std::vector<std::string> cmd;
-};
-
-void usage(const char *argv0) {
-    std::cerr << "mulation — mutation layer on Google Test / CTest\n"
-              << "Usage:\n"
-              << "  " << argv0 << " [options] [--] <test-binary> [args...]\n"
-              << "  " << argv0 << " [options] -- ctest [ctest-args...]\n"
-              << "  " << argv0 << " c++ [clang++-args...]     (compiler wrapper)\n"
-              << "  " << argv0 << " cc  [clang-args...]       (compiler wrapper)\n"
-              << "\nOptions:\n"
-              << "  --min-score N       Fail if kill rate is below N percent (CI gate)\n"
-              << "  --git-diff [BASE]   Only mutants on lines changed vs BASE (default HEAD)\n"
-              << "  --timeout-ms N      Per-mutant timeout (default: 5x baseline + 1000ms)\n"
-              << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
-              << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
-              << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
-              << "  --json-out FILE     Write machine-readable report\n"
-              << "  -h, --help          Show this help\n";
-}
 
 std::string dirname_of(std::string path) {
     std::vector<char> buf(path.begin(), path.end());
@@ -166,107 +136,6 @@ std::string compiler_for(const std::string &alias) {
     return "clang";
 }
 
-void require_value(int i, int argc, char **argv, const char *opt) {
-    if (i + 1 >= argc || argv[i + 1] == nullptr) {
-        std::cerr << "mulation: " << opt << " requires a value\n";
-        usage(argv[0]);
-        std::exit(2);
-    }
-}
-
-Options parse_args(int argc, char **argv) {
-    Options o;
-    int i = 1;
-    while (i < argc) {
-        std::string a = argv[i];
-        if (a == "--") {
-            ++i;
-            while (i < argc) {
-                o.cmd.emplace_back(argv[i++]);
-            }
-            break;
-        }
-        if (a == "-h" || a == "--help") {
-            usage(argv[0]);
-            std::exit(0);
-        }
-        if (a == "--min-score") {
-            require_value(i, argc, argv, "--min-score");
-            o.min_score = std::atoi(argv[++i]);
-            o.min_score_set = true;
-            ++i;
-            continue;
-        }
-        if (a.rfind("--min-score=", 0) == 0) {
-            o.min_score = std::atoi(a.c_str() + 12);
-            o.min_score_set = true;
-            ++i;
-            continue;
-        }
-        if (a == "--git-diff") {
-            o.git_diff = true;
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                std::string n = argv[i + 1];
-                if (n != "--" && n.find('/') == std::string::npos &&
-                    n.find('.') == std::string::npos) {
-                    o.git_base = n;
-                    ++i;
-                } else if (n == "HEAD" || n.rfind("HEAD", 0) == 0 || n.rfind("origin/", 0) == 0) {
-                    o.git_base = n;
-                    ++i;
-                }
-            }
-            ++i;
-            continue;
-        }
-        if (a.rfind("--git-diff=", 0) == 0) {
-            o.git_diff = true;
-            o.git_base = a.substr(11);
-            ++i;
-            continue;
-        }
-        if (a == "--timeout-ms") {
-            require_value(i, argc, argv, "--timeout-ms");
-            o.timeout_ms = std::atoi(argv[++i]);
-            ++i;
-            continue;
-        }
-        if (a == "--no-coverage") {
-            o.no_coverage = true;
-            ++i;
-            continue;
-        }
-        if (a == "--catalog-dir") {
-            require_value(i, argc, argv, "--catalog-dir");
-            o.catalog_dir = argv[++i];
-            ++i;
-            continue;
-        }
-        if (a == "--binary") {
-            require_value(i, argc, argv, "--binary");
-            o.binaries.emplace_back(argv[++i]);
-            ++i;
-            continue;
-        }
-        if (a == "--json-out") {
-            require_value(i, argc, argv, "--json-out");
-            o.json_out = argv[++i];
-            ++i;
-            continue;
-        }
-        if (a.rfind("-", 0) == 0) {
-            std::cerr << "unknown option: " << a << "\n";
-            usage(argv[0]);
-            std::exit(2);
-        }
-        while (i < argc) {
-            o.cmd.emplace_back(argv[i++]);
-        }
-        break;
-    }
-    return o;
-}
-
 std::set<uint32_t> load_hitlog(const std::string &path) {
     std::set<uint32_t> ids;
     std::ifstream in(path);
@@ -301,7 +170,7 @@ std::vector<std::string> discover_ctest_binaries(const std::vector<std::string> 
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        usage(argv[0]);
+        std::cerr << usage_text(argv[0]);
         return 2;
     }
 
@@ -314,9 +183,18 @@ int main(int argc, char **argv) {
         return run_wrapper(self, compiler_for(argv[1]), rest);
     }
 
-    Options opt = parse_args(argc, argv);
+    ParseResult parsed = parse_args(argc, argv);
+    if (parsed.kind == ParseKind::Help) {
+        std::cout << parsed.message;
+        return 0;
+    }
+    if (parsed.kind == ParseKind::Error) {
+        std::cerr << parsed.message;
+        return 2;
+    }
+    Options opt = std::move(parsed.options);
     if (opt.cmd.empty()) {
-        usage(argv[0]);
+        std::cerr << usage_text(argv[0]);
         return 2;
     }
 

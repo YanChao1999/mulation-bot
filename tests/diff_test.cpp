@@ -1,6 +1,20 @@
 #include "diff.hpp"
 #include "unit_check.hpp"
 
+TEST(Diff, ParseMultipleFiles) {
+    const char *text = "+++ b/a.cpp\n"
+                       "@@ -1 +1 @@\n"
+                       "+x\n"
+                       "+++ b/b.cpp\n"
+                       "@@ -2,0 +3,1 @@\n"
+                       "+y\n";
+    auto ranges = parse_git_diff_text(text);
+    CHECK_EQ(ranges.size(), 2u);
+    CHECK_EQ(ranges[0].file, std::string("a.cpp"));
+    CHECK_EQ(ranges[1].file, std::string("b.cpp"));
+    CHECK_EQ(ranges[1].start, 3u);
+}
+
 TEST(Diff, ParseUnifiedHunks) {
     const char *text = "diff --git a/src/foo.cpp b/src/foo.cpp\n"
                        "--- a/src/foo.cpp\n"

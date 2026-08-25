@@ -46,6 +46,7 @@ set(_runner_src
   runner/catalog.cpp
   runner/process.cpp
   runner/diff.cpp
+  runner/cli.cpp
 )
 add_executable(mulation-run ${_runner_src})
 target_include_directories(mulation-run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
@@ -76,9 +77,12 @@ if(MULATION_BUILD_TESTS)
     tests/catalog_test.cpp
     tests/diff_test.cpp
     tests/process_test.cpp
+    tests/cli_test.cpp
+    tests/elf_catalog_test.cpp
     runner/catalog.cpp
     runner/diff.cpp
     runner/process.cpp
+    runner/cli.cpp
   )
   target_include_directories(mulation_unit_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner

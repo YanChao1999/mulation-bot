@@ -2,6 +2,8 @@
 
 A mutation-testing **layer** on Google Test and CTest — not a unit-test framework replacement.
 
+**Site:** https://yanchao1999.github.io/mulation-bot/ · **Releases:** https://github.com/YanChao1999/mulation-bot/releases
+
 | | Google Test | CTest | mulation-bot |
 |---|---|---|---|
 | Role | Write tests | Run binaries | Score how useful those tests are |
@@ -23,6 +25,26 @@ mulation --git-diff --min-score 80 -- ctest --test-dir build
 
 Wire that after a green `ctest` / gtest run. Full-suite mutation without `--git-diff` is usually too slow for every PR.
 
+## Install from a GitHub Release
+
+Tagged versions (`v*`) publish a Linux x86_64 tarball via `.github/workflows/release.yml`.
+
+```bash
+# download mulation-bot-*-linux-x86_64.tar.gz from Releases, then:
+tar xf mulation-bot-*-linux-x86_64.tar.gz
+sudo cp -a mulation-bot-*/bin/* /usr/local/bin/
+sudo cp -a mulation-bot-*/lib/* /usr/local/lib/
+sudo cp -a mulation-bot-*/include/mulation /usr/local/include/
+sudo apt install clang-18 llvm-18   # pass plugin needs LLVM 18
+```
+
+Or build from source:
+
+```bash
+make && make install PREFIX=$HOME/.local
+export PATH="$HOME/.local/bin:$PATH"
+```
+
 ## Valgrind-style usage
 
 Same habit as Valgrind — wrap the test command:
@@ -36,9 +58,6 @@ mulation -- ctest
 Product code must be built with instrumentation (Clang/LLVM pass). Test sources are skipped.
 
 ```bash
-make && make install          # or: PREFIX=$HOME/.local make install
-export PATH="$HOME/.local/bin:$PATH"   # if not installing to /usr/local
-
 CXX="mulation c++" CC="mulation cc" cmake -B build && cmake --build build
 ctest --test-dir build
 mulation --git-diff --min-score 80 -- ./build/my_tests
@@ -47,7 +66,7 @@ mulation --git-diff --min-score 80 -- ./build/my_tests
 CMake helper (optional; CTest stays the unit runner):
 
 ```cmake
-list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/Mulation")  # after make install
+list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/Mulation")  # after install
 include(Mulation)
 mulation_instrument(my_lib)       # SUT only
 mulation_add_check(my_tests)      # cmake --build . --target mulation-check
@@ -64,15 +83,14 @@ sudo apt install clang-18 llvm-18-dev   # plugin build
 make                 # plugin, runtime, mulation / mulation-run
 make test            # quiet: runner + runtime + one mulation-run on the example binary
 make install-smoke   # install to a temp prefix and check the wrapper finds assets
+make package         # dist/mulation-bot-*-linux-*.tar.gz (+ .sha256)
 make check           # test + format-check + tidy
 ```
 
 Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
 
-```bash
-make install PREFIX=/usr/local          # needs write access to PREFIX
-make install PREFIX=$HOME/.local
-```
+Publish a release: push a tag `v0.1.0` (workflow builds, tests, uploads the tarball).  
+GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
 
 Install layout:
 
@@ -133,4 +151,6 @@ make test
 - `tests/` — unit tests for catalog, git-diff, process, runtime
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
-- `scripts/` — format, tidy, install-smoke
+- `docs/` — GitHub Pages site
+- `scripts/` — format, tidy, install-smoke, package-release
+- `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`

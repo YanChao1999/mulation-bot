@@ -20,7 +20,7 @@ RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.
 UNIT_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp tests/process_test.cpp \
 	runner/catalog.cpp runner/diff.cpp runner/process.cpp
 
-.PHONY: all example test lint tidy format format-check check clean install install-smoke
+.PHONY: all example test lint tidy format format-check check clean install install-smoke package
 
 all: $(PLUGIN) $(RUNTIME) $(RUNNER) $(MULATION)
 
@@ -92,8 +92,14 @@ format-check:
 check: test format-check lint
 	@echo "== make check: tests + format + tidy ok =="
 
+install-smoke: all
+	sh scripts/install-smoke.sh
+
+package: all
+	sh scripts/package-release.sh
+
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) dist
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/include/mulation
@@ -104,6 +110,3 @@ install: all
 	install -m 0644 include/mulation/mulation.h $(DESTDIR)$(PREFIX)/include/mulation/mulation.h
 	install -d $(DESTDIR)$(PREFIX)/lib/cmake/Mulation
 	install -m 0644 cmake/Mulation.cmake $(DESTDIR)$(PREFIX)/lib/cmake/Mulation/Mulation.cmake
-
-install-smoke: all
-	sh scripts/install-smoke.sh

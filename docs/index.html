@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mulation — mutation layer for Google Test &amp; CTest</title>
+    <meta
+      name="description"
+      content="Prove C/C++ unit tests catch real bugs. A Valgrind-style mutation gate on gtest and CTest."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="./">mulation</a>
+      <nav>
+        <a href="https://github.com/YanChao1999/mulation-bot">GitHub</a>
+        <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="brand-mark">mulation</p>
+        <h1>Prove your tests would catch the bug.</h1>
+        <p class="lede">
+          A mutation-testing layer on Google Test and CTest — not another framework.
+          Compile once with Clang, flip mutants at runtime, gate PRs on score.
+        </p>
+        <p class="cta">
+          <a class="btn primary" href="https://github.com/YanChao1999/mulation-bot/releases"
+            >Download release</a
+          >
+          <a class="btn" href="https://github.com/YanChao1999/mulation-bot">View source</a>
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Same habit as Valgrind</h2>
+        <pre><code>mulation --git-diff --min-score 80 -- ./build/my_tests
+mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
+        <p>
+          Keep writing <code>TEST</code> / <code>EXPECT_*</code>. Instrument product code with
+          <code>mulation c++</code>, leave CTest as the unit runner, use mulation as the
+          pre-production gate.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Install from a release package</h2>
+        <pre><code>tar xf mulation-bot-*-linux-x86_64.tar.gz
+# copy bin/, lib/, include/ into /usr/local or $HOME/.local
+sudo apt install clang-18 llvm-18   # plugin needs LLVM 18
+
+CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build
+ctest --test-dir build
+mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
+      </section>
+
+      <section class="panel split">
+        <div>
+          <h2>What the score means</h2>
+          <ul>
+            <li><strong>killed</strong> — suite failed or timed out under the mutant</li>
+            <li><strong>survived</strong> — suite stayed green</li>
+            <li><strong>score</strong> — killed / (killed + survived)</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Honest limits</h2>
+          <ul>
+            <li>Linux + Clang/LLVM 18 today</li>
+            <li>Needs a rebuild with the pass plugin (not pure DBI)</li>
+            <li>Prefer <code>--git-diff</code> so PR campaigns stay cheap</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        <a href="https://github.com/YanChao1999/mulation-bot">YanChao1999/mulation-bot</a>
+        · MIT
+      </p>
+    </footer>
+  </body>
+</html>

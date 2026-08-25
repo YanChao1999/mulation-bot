@@ -1,0 +1,72 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: build and package (linux-x86_64)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      CXX: clang++-18
+      CC: clang-18
+      LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18-dev
+
+      - name: Test
+        run: make test
+
+      - name: Install smoke
+        run: make install-smoke
+
+      - name: Package
+        run: |
+          chmod +x scripts/package-release.sh
+          sh scripts/package-release.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mulation-bot-linux-x86_64
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Prebuilt **Linux x86_64** install tree (bin + plugin + runtime + CMake module).
+
+            Requires **Clang/LLVM 18** on the host (Ubuntu 24.04: `clang-18 llvm-18`).
+
+            ```bash
+            tar xf mulation-bot-*-linux-x86_64.tar.gz
+            # copy bin/, lib/, include/ into a PREFIX, then:
+            CXX="mulation c++" CC="mulation cc" cmake -B build && cmake --build build
+            mulation --git-diff --min-score 80 -- ./build/my_tests
+            ```
+
+            Site: https://yanchao1999.github.io/mulation-bot/
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

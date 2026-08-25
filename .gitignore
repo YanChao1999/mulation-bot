@@ -43,12 +43,12 @@
 build/
 Build/
 build-*/
+dist/
 
-# CMake generated files
+# CMake generated files (in-tree Makefile is the project build file)
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 install_manifest.txt
 compile_commands.json
 
@@ -67,3 +67,4 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+.tools/

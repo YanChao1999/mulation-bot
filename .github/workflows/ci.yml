@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+
+jobs:
+  format-and-tidy:
+    name: clang-format and clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format and clang-tidy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-format-18 clang-tidy-18
+      - name: clang-format
+        run: make format-check
+        env:
+          CI: true
+      - name: clang-tidy
+        run: make tidy
+        env:
+          CI: true
+
+  test:
+    name: unit tests and mutation example
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18-dev
+      - name: Build, test, mutation example
+        run: make test
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+      - name: Install smoke (PATH layout + wrapper compile)
+        run: make install-smoke
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config

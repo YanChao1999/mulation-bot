@@ -1,0 +1,77 @@
+#include "mulation/mulation.h"
+
+#include <stdatomic.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static unsigned g_active = (unsigned)-1;
+static unsigned g_hitlog_on;
+static char g_hitlog_path[1024];
+
+enum { HIT_CAP = 1 << 16 };
+
+static atomic_uint g_hit_slots[HIT_CAP];
+static atomic_uint g_hit_count;
+
+static unsigned hit_hash(unsigned id) {
+    id ^= id >> 16;
+    id *= 0x7feb352du;
+    id ^= id >> 15;
+    return id;
+}
+
+static void record_hit(unsigned id) {
+    if (!g_hitlog_on) {
+        return;
+    }
+    unsigned slot = hit_hash(id) & (HIT_CAP - 1);
+    for (unsigned n = 0; n < 16; ++n) {
+        unsigned i = (slot + n) & (HIT_CAP - 1);
+        unsigned expected = 0;
+        if (atomic_compare_exchange_strong(&g_hit_slots[i], &expected, id)) {
+            atomic_fetch_add_explicit(&g_hit_count, 1u, memory_order_relaxed);
+            return;
+        }
+        if (expected == id) {
+            return;
+        }
+    }
+}
+
+static void mulation_flush_hits(void) {
+    if (!g_hitlog_on || g_hitlog_path[0] == '\0') {
+        return;
+    }
+    FILE *f = fopen(g_hitlog_path, "ab");
+    if (!f) {
+        return;
+    }
+    for (unsigned i = 0; i < HIT_CAP; ++i) {
+        unsigned id = atomic_load_explicit(&g_hit_slots[i], memory_order_relaxed);
+        if (id != 0) {
+            fprintf(f, "%u\n", id);
+        }
+    }
+    fclose(f);
+}
+
+static void mulation_init(void) __attribute__((constructor));
+static void mulation_init(void) {
+    const char *e = getenv("MULATION_MUTANT");
+    if (e && e[0] != '\0') {
+        g_active = (unsigned)strtoul(e, NULL, 10);
+    }
+    const char *h = getenv("MULATION_HITLOG");
+    if (h && h[0] != '\0') {
+        g_hitlog_on = 1;
+        strncpy(g_hitlog_path, h, sizeof(g_hitlog_path) - 1);
+        atexit(mulation_flush_hits);
+    }
+}
+
+int mulation_active(unsigned id) {
+    record_hit(id);
+    return g_active == id;
+}

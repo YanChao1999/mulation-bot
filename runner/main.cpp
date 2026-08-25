@@ -155,7 +155,13 @@ bool looks_like_compiler(const std::string &s) {
 
 std::string compiler_for(const std::string &alias) {
     if (alias == "c++" || alias == "clang++" || alias == "g++") {
+        if (const char *e = getenv("CXX")) {
+            return e;
+        }
         return "clang++";
+    }
+    if (const char *e = getenv("CC")) {
+        return e;
     }
     return "clang";
 }

@@ -6,12 +6,12 @@
     <title>mulation — mutation layer for Google Test &amp; CTest</title>
     <meta
       name="description"
-      content="Prove C/C++ unit tests catch real bugs. A Valgrind-style mutation gate on gtest and CTest."
+      content="Green unit tests and high coverage can still miss bugs. mulation injects faults to prove your assertions would catch them."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Fragment+Mono&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
@@ -20,70 +20,143 @@
     <header class="top">
       <a class="brand" href="./">mulation</a>
       <nav>
-        <a href="https://github.com/YanChao1999/mulation-bot">GitHub</a>
+        <a href="#why">Why it matters</a>
         <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
+        <a href="https://github.com/YanChao1999/mulation-bot">GitHub</a>
       </nav>
     </header>
 
-    <main>
-      <section class="hero">
+    <section class="hero" aria-label="Introduction">
+      <div class="hero-copy">
         <p class="brand-mark">mulation</p>
-        <h1>Prove your tests would catch the bug.</h1>
+        <h1>Coverage can lie. Mutation doesn’t.</h1>
         <p class="lede">
-          A mutation-testing layer on Google Test and CTest — not another framework.
-          Compile once with Clang, flip mutants at runtime, gate PRs on score.
+          A green suite can hit every line and still miss a boundary bug. mulation
+          changes the code and asks whether a test fails.
         </p>
         <p class="cta">
-          <a class="btn primary" href="https://github.com/YanChao1999/mulation-bot/releases"
+          <a class="btn primary" href="#why">See the gap</a>
+          <a class="btn" href="https://github.com/YanChao1999/mulation-bot/releases"
             >Download release</a
           >
-          <a class="btn" href="https://github.com/YanChao1999/mulation-bot">View source</a>
         </p>
+      </div>
+
+      <div class="hero-stage" aria-hidden="true">
+        <div class="storyboard">
+          <div class="story-pane pass">
+            <p class="story-kicker">What CI usually trusts</p>
+            <ul>
+              <li><span class="tag ok">PASS</span> unit tests green</li>
+              <li><span class="tag ok">100%</span> line coverage on <code>is_adult</code></li>
+              <li><span class="tag ok">SHIP</span> looks safe</li>
+            </ul>
+          </div>
+          <div class="story-pane fail">
+            <p class="story-kicker">What mulation finds</p>
+            <pre><code>age &gt;= 18   →   age &gt; 18
+TEST(Adult, TwentyIsAdult)   still PASS
+<span class="warn">mutant survived</span> — no age-18 assertion</code></pre>
+            <p class="story-verdict">Covered ≠ tested.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main>
+      <section class="band proof" id="why">
+        <h2>A real hole under “good” coverage</h2>
+        <p class="support">
+          Product code returns <code>age &gt;= 18</code>. The unit test only checks age
+          <code>20</code>. Coverage marks the line executed. Change the operator to
+          <code>&gt;</code> and the suite stays green — age 18 is never asserted.
+        </p>
+
+        <div class="proof-grid">
+          <figure>
+            <figcaption>Product</figcaption>
+            <pre class="cmd"><code>int is_adult(int age) {
+  return age &gt;= 18;   /* covered */
+}</code></pre>
+          </figure>
+          <figure>
+            <figcaption>Weak unit test</figcaption>
+            <pre class="cmd"><code>TEST(Adult, TwentyIsAdult) {
+  EXPECT_TRUE(is_adult(20));
+}
+/* never checks 18 vs 17 */</code></pre>
+          </figure>
+        </div>
+
+        <pre class="cmd report"><code>mulation -- ./compare_tests
+
+  [survived]  compare.cpp:4  [ROR] &gt;= -&gt; &gt;
+  [survived]  compare.cpp:8  [ROR] &gt;  -&gt; &gt;=
+  [killed]    compare.cpp:12 [AOR] +  -&gt; -
+
+score: 33%   ← coverage said 100%; mutation said the suite is weak</code></pre>
       </section>
 
-      <section class="panel">
+      <section class="band" id="get-started">
         <h2>Same habit as Valgrind</h2>
-        <pre><code>mulation --git-diff --min-score 80 -- ./build/my_tests
-mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
-        <p>
-          Keep writing <code>TEST</code> / <code>EXPECT_*</code>. Instrument product code with
-          <code>mulation c++</code>, leave CTest as the unit runner, use mulation as the
-          pre-production gate.
+        <p class="support">
+          Keep writing Google Test. Keep running CTest. Add mulation as the gate that
+          asks: if this operator were wrong, would a test fail?
         </p>
+        <pre class="cmd"><code>mulation --git-diff --min-score 80 -- ./build/my_tests
+mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
       </section>
 
-      <section class="panel">
-        <h2>Install from a release package</h2>
-        <pre><code>tar xf mulation-bot-*-linux-x86_64.tar.gz
-# copy bin/, lib/, include/ into /usr/local or $HOME/.local
-sudo apt install clang-18 llvm-18   # plugin needs LLVM 18
+      <section class="band">
+        <h2>Install, instrument, gate</h2>
+        <p class="support">
+          Linux x86_64 release + Clang/LLVM 18. Instrument the SUT once; flip mutants at
+          runtime without rebuilding for each one.
+        </p>
+        <pre class="cmd"><code>tar xf mulation-bot-*-linux-x86_64.tar.gz
+# copy bin/, lib/, include/ into a PREFIX
 
 CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build
-ctest --test-dir build
+ctest --test-dir build          # must stay green
 mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
       </section>
 
-      <section class="panel split">
-        <div>
-          <h2>What the score means</h2>
-          <ul>
-            <li><strong>killed</strong> — suite failed or timed out under the mutant</li>
-            <li><strong>survived</strong> — suite stayed green</li>
-            <li><strong>score</strong> — killed / (killed + survived)</li>
-          </ul>
-        </div>
-        <div>
-          <h2>Honest limits</h2>
-          <ul>
-            <li>Linux + Clang/LLVM 18 today</li>
-            <li>Needs a rebuild with the pass plugin (not pure DBI)</li>
-            <li>Prefer <code>--git-diff</code> so PR campaigns stay cheap</li>
-          </ul>
-        </div>
+      <section class="band definitions">
+        <h2>What the score means</h2>
+        <dl>
+          <div>
+            <dt>killed</dt>
+            <dd>A test failed or timed out — the suite noticed the injected bug.</dd>
+          </div>
+          <div>
+            <dt>survived</dt>
+            <dd>
+              Suite still green after the fault — coverage may have hit the line, but no
+              assertion depended on the correct operator.
+            </dd>
+          </div>
+          <div>
+            <dt>score</dt>
+            <dd>
+              killed / (killed + survived). Use <code>--git-diff</code> so PR campaigns
+              stay cheap.
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="band limits">
+        <h2>Honest limits</h2>
+        <p class="support">
+          Clang/LLVM 18 on Linux today. Needs a rebuild with the pass plugin — not pure
+          DBI. Equivalent mutants can inflate “survived.” Young tool; niche is a thin
+          gtest/CTest gate that proves weak tests before production.
+        </p>
       </section>
     </main>
 
     <footer>
+      <a class="brand" href="./">mulation</a>
       <p>
         <a href="https://github.com/YanChao1999/mulation-bot">YanChao1999/mulation-bot</a>
         · MIT

@@ -25,7 +25,7 @@ jobs:
           CI: true
 
   test:
-    name: unit tests and mutation example
+    name: unit tests and mutation (example + self)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

@@ -7,6 +7,20 @@
 #include <unistd.h>
 #include <vector>
 
+TEST(Catalog, JsonEscapeLowControls) {
+    CHECK_EQ(json_escape(std::string("\x01\x1f")), std::string("\\u0001\\u001f"));
+}
+
+TEST(Catalog, ParseCTestEmptyCommandArray) {
+    auto paths = parse_ctest_command_paths("{\"tests\":[{\"command\":[]}]}");
+    CHECK(paths.empty());
+}
+
+TEST(Catalog, ParseCTestNoCommandKey) {
+    auto paths = parse_ctest_command_paths("{\"tests\":[{\"name\":\"only\"}]}");
+    CHECK(paths.empty());
+}
+
 TEST(Catalog, JsonEscapeQuotesAndControls) {
     CHECK_EQ(json_escape("a\"b\\c"), std::string("a\\\"b\\\\c"));
     CHECK_EQ(json_escape("x\ny\tz"), std::string("x\\ny\\tz"));

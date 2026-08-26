@@ -81,13 +81,15 @@ sudo apt install clang-18 llvm-18-dev   # plugin build
 # optional: clang-format-18 clang-tidy-18
 
 make                 # plugin, runtime, mulation / mulation-run
-make test            # quiet: runner + runtime + one mulation-run on the example binary
+make test            # quiet: unit + runtime + mulation on example + self (runner lib)
 make install-smoke   # install to a temp prefix and check the wrapper finds assets
 make package         # dist/mulation-bot-*-linux-*.tar.gz (+ .sha256)
 make check           # test + format-check + tidy
 ```
 
 Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
+
+`make test` dogfoods the tool: an instrumented `mulation_self_tests` binary (runner library + existing unit suite) is scored with `mulation-run --min-score 0`. Do not pad unit assertions just to raise that score — survivors are the signal.
 
 Publish a release: push a tag `v0.1.0` (workflow builds, tests, uploads the tarball).  
 GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
@@ -137,10 +139,14 @@ The tool does not invent per-operator advice. Survived lines are locations for y
 
 `examples/gtest-ctest/` is a demo green suite with a weak boundary (surviving `>=` → `>`). It is not special-cased in the runner; any instrumented test binary works the same way.
 
+The same idea applies to **mulation-bot itself**: `make test` scores an instrumented runner-library binary (`build/mulation_self_tests`: catalog/diff/cli + matching unit tests). Report the score; do not invent stronger cases only to kill mutants. Process stays on the plain unit suite only (timeouts would explode self-campaign time).
+
 ```bash
 make test
-# == mulation ==
-# ... score from mulation-run on build/compare_tests
+# == mulation (example) ==
+# ... score on build/compare_tests
+# == mulation (self) ==
+# ... score on build/mulation_self_tests
 ```
 
 ## Layout
@@ -148,7 +154,7 @@ make test
 - `plugin/` — LLVM pass (`-fpass-plugin=libmulation_plugin.so`)
 - `runtime/` — `mulation_active(id)`, env `MULATION_MUTANT` / `MULATION_HITLOG`
 - `runner/` — `mulation` / `mulation-run`
-- `tests/` — unit tests for catalog, git-diff, process, runtime
+- `tests/` — unit suite for catalog, git-diff, process, cli, runtime; also drives self-mutation
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
 - `docs/` — GitHub Pages site

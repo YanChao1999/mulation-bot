@@ -46,6 +46,7 @@ set(_runner_src
   runner/catalog.cpp
   runner/process.cpp
   runner/diff.cpp
+  runner/cli.cpp
 )
 add_executable(mulation-run ${_runner_src})
 target_include_directories(mulation-run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
@@ -71,20 +72,62 @@ if(MULATION_BUILD_TESTS OR MULATION_BUILD_EXAMPLES)
 endif()
 
 if(MULATION_BUILD_TESTS)
-  add_executable(mulation_unit_tests
+  set(_unit_test_src
     tests/unit_main.cpp
     tests/catalog_test.cpp
     tests/diff_test.cpp
     tests/process_test.cpp
+    tests/cli_test.cpp
+    tests/elf_catalog_test.cpp
+  )
+  set(_runner_lib_src
     runner/catalog.cpp
     runner/diff.cpp
     runner/process.cpp
+    runner/cli.cpp
   )
+  add_executable(mulation_unit_tests ${_unit_test_src} ${_runner_lib_src})
   target_include_directories(mulation_unit_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
     ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_options(mulation_unit_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
   add_test(NAME mulation_unit_tests COMMAND mulation_unit_tests)
+
+  set(_self_test_src
+    tests/unit_main.cpp
+    tests/catalog_test.cpp
+    tests/diff_test.cpp
+    tests/cli_test.cpp
+    tests/elf_catalog_test.cpp
+  )
+  set(_self_sut_src
+    runner/catalog.cpp
+    runner/diff.cpp
+    runner/cli.cpp
+  )
+  # Dogfood: instrument catalog/diff/cli only; omit process (+ its tests) for speed.
+  add_library(mulation_self_sut OBJECT ${_self_sut_src})
+  target_include_directories(mulation_self_sut PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/runner
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  target_compile_options(mulation_self_sut PRIVATE
+    -Wall -Wextra -Wpedantic -Werror -g -O0
+    "-fpass-plugin=${MULATION_PLUGIN_PATH}")
+  if(TARGET mulation_plugin)
+    add_dependencies(mulation_self_sut mulation_plugin)
+  endif()
+  add_executable(mulation_self_tests ${_self_test_src} runner/process.cpp
+                 $<TARGET_OBJECTS:mulation_self_sut>)
+  target_include_directories(mulation_self_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/runner
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  target_compile_options(mulation_self_tests PRIVATE -Wall -Wextra -Wpedantic -Werror -g -O0)
+  target_link_libraries(mulation_self_tests PRIVATE ${MULATION_RUNTIME_TARGET})
+  target_include_directories(mulation_self_tests PRIVATE
+    $<TARGET_PROPERTY:${MULATION_RUNTIME_TARGET},INTERFACE_INCLUDE_DIRECTORIES>)
+  add_test(NAME mulation_self_check
+    COMMAND $<TARGET_FILE:mulation-run> --min-score 0 $<TARGET_FILE:mulation_self_tests>)
+  set_tests_properties(mulation_self_check PROPERTIES DEPENDS mulation_unit_tests)
 
   add_executable(runtime_test tests/runtime_test.c)
   target_link_libraries(runtime_test PRIVATE mulation_runtime)

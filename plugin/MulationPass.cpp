@@ -91,7 +91,8 @@ static bool skipPath(StringRef p) {
     // System / toolchain headers (paths may be relative via ../ from clang).
     if (lower.find("/usr/include/") != std::string::npos ||
         lower.find("/usr/lib/") != std::string::npos || lower.find("/bits/") != std::string::npos ||
-        lower.find("/lib/gcc/") != std::string::npos || lower.find("include/c++/") != std::string::npos ||
+        lower.find("/lib/gcc/") != std::string::npos ||
+        lower.find("include/c++/") != std::string::npos ||
         lower.find("include/c++\\") != std::string::npos ||
         lower.find("/libc++/") != std::string::npos) {
         return true;

@@ -524,7 +524,7 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
 } // namespace
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
-    return {LLVM_PLUGIN_API_VERSION, "mulation", "0.1.0", [](PassBuilder &PB) {
+    return {LLVM_PLUGIN_API_VERSION, "mulation", "0.0.1", [](PassBuilder &PB) {
                 PB.registerPipelineStartEPCallback([](ModulePassManager &MPM, OptimizationLevel) {
                     MPM.addPass(MulationInstrumentPass());
                 });

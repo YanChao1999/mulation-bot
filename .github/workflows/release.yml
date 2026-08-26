@@ -57,6 +57,15 @@ jobs:
 
             Requires **Clang/LLVM 18** on the host (Ubuntu 24.04: `clang-18 llvm-18`).
 
+            **One command:**
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/${{ github.ref_name }}/scripts/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            ```
+
+            **Manual tarball:**
+
             ```bash
             tar xf mulation-bot-*-linux-x86_64.tar.gz
             # copy bin/, lib/, include/ into a PREFIX, then:
@@ -68,5 +77,6 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.sha256
+            scripts/install.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mulation-bot VERSION 0.1.0 LANGUAGES C CXX)
+project(mulation-bot VERSION 0.0.1 LANGUAGES C CXX)
 
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   message(WARNING "Build the pass plugin with Clang: cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang")

@@ -47,7 +47,10 @@ Requirements:
   - Clang/LLVM 18 development libraries at runtime for the pass plugin
     (e.g. Ubuntu 24.04: sudo apt install clang-18 llvm-18)
 
-Install:
+Install (one command):
+  curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v${VERSION}/scripts/install.sh | sh
+
+Install (tarball):
   tar xf ${PKG_NAME}.tar.gz
   sudo cp -a ${PKG_NAME}/bin/* /usr/local/bin/
   sudo cp -a ${PKG_NAME}/lib/* /usr/local/lib/

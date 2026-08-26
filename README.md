@@ -27,7 +27,20 @@ Wire that after a green `ctest` / gtest run. Full-suite mutation without `--git-
 
 ## Install from a GitHub Release
 
-Tagged versions (`v*`) publish a Linux x86_64 tarball via `.github/workflows/release.yml`.
+One command (Linux x86_64, installs to `$HOME/.local`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Pin a version or prefix:
+
+```bash
+MULATION_VERSION=v0.0.1 PREFIX=$HOME/.local sh -c 'curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh'
+```
+
+Manual install from the release tarball:
 
 ```bash
 # download mulation-bot-*-linux-x86_64.tar.gz from Releases, then:
@@ -91,7 +104,7 @@ Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
 
 `make test` dogfoods the tool: an instrumented `mulation_self_tests` binary (runner library + existing unit suite) is scored with `mulation-run --min-score 0`. Do not pad unit assertions just to raise that score — survivors are the signal.
 
-Publish a release: push a tag `v0.1.0` (workflow builds, tests, uploads the tarball).  
+Publish a release: push a tag `v0.0.1` (workflow builds, tests, uploads the tarball + `install.sh`).  
 GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
 
 Install layout:
@@ -158,5 +171,5 @@ make test
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
 - `docs/` — GitHub Pages site
-- `scripts/` — format, tidy, install-smoke, package-release
+- `scripts/` — format, tidy, install, install-smoke, package-release
 - `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`

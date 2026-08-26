@@ -108,15 +108,20 @@ mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
       <section class="band">
         <h2>Install, instrument, gate</h2>
         <p class="support">
-          Linux x86_64 release + Clang/LLVM 18. Instrument the SUT once; flip mutants at
-          runtime without rebuilding for each one.
+          Linux x86_64 release + Clang/LLVM 18. One command installs to
+          <code>$HOME/.local</code>; instrument the SUT once, flip mutants at runtime.
         </p>
-        <pre class="cmd"><code>tar xf mulation-bot-*-linux-x86_64.tar.gz
-# copy bin/, lib/, include/ into a PREFIX
+        <pre class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 
 CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build
 ctest --test-dir build          # must stay green
 mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
+        <p class="support">
+          Prefer a tarball? Grab
+          <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
+          or pin <code>MULATION_VERSION=v0.0.1</code> when running the script.
+        </p>
       </section>
 
       <section class="band definitions">

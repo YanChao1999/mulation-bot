@@ -60,7 +60,7 @@ jobs:
             **One command:**
 
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/${{ github.ref_name }}/scripts/install.sh | sh
+            curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/${{ github.ref_name }}/install.sh | sh
             export PATH="$HOME/.local/bin:$PATH"
             ```
 

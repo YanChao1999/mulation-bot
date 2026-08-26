@@ -48,7 +48,7 @@ Requirements:
     (e.g. Ubuntu 24.04: sudo apt install clang-18 llvm-18)
 
 Install (one command):
-  curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v${VERSION}/scripts/install.sh | sh
+  curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v${VERSION}/install.sh | sh
 
 Install (tarball):
   tar xf ${PKG_NAME}.tar.gz

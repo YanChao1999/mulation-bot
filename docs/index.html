@@ -111,7 +111,7 @@ mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
           Linux x86_64 release + Clang/LLVM 18. One command installs to
           <code>$HOME/.local</code>; instrument the SUT once, flip mutants at runtime.
         </p>
-        <pre class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh
+        <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
 CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build

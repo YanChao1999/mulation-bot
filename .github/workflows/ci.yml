@@ -45,3 +45,32 @@ jobs:
           CXX: clang++-18
           CC: clang-18
           LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+
+  package:
+    name: package tarball (release dry-run)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18-dev
+      - name: Build and package
+        run: |
+          chmod +x scripts/package-release.sh scripts/install.sh
+          VERSION=0.0.1-ci sh scripts/package-release.sh
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+      - name: Verify install layout from tarball
+        run: |
+          set -eu
+          pkg=$(ls dist/mulation-bot-0.0.1-ci-linux-x86_64.tar.gz)
+          work=$(mktemp -d)
+          tar -C "$work" -xf "$pkg"
+          stage="$work/mulation-bot-0.0.1-ci-linux-x86_64"
+          test -x "$stage/bin/mulation"
+          test -f "$stage/lib/libmulation_plugin.so"
+          test -f "$stage/include/mulation/mulation.h"
+          test -f scripts/install.sh

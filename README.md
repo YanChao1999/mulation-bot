@@ -4,6 +4,8 @@ A mutation-testing **layer** on Google Test and CTest — not a unit-test framew
 
 **Site:** https://yanchao1999.github.io/mulation-bot/ · **Releases:** https://github.com/YanChao1999/mulation-bot/releases
 
+Agent materials (skills) are pinned with [abom](https://github.com/YanChao1999/abom) — see [`docs/abom.md`](docs/abom.md) and `abom.lock.json`.
+
 | | Google Test | CTest | mulation-bot |
 |---|---|---|---|
 | Role | Write tests | Run binaries | Score how useful those tests are |

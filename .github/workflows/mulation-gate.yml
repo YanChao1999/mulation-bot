@@ -1,0 +1,71 @@
+# Dogfood of examples/consumer-template/mulation-gate.yml for this repository.
+name: mulation-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TEST_BINARY: ./build/compare_tests
+  MIN_SCORE: "0"
+  MULATION_VERSION: v0.0.3
+  JOBS: "4"
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang 18
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18-dev jq
+
+      - name: Install mulation
+        env:
+          PREFIX: ${{ runner.temp }}/mulation-prefix
+        run: |
+          set -eu
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/install.sh" \
+            | sh
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+          "${PREFIX}/bin/mulation" --help >/dev/null
+
+      - name: Build instrumented example
+        run: make example
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+
+      - name: Unit tests must stay green
+        run: "$TEST_BINARY"
+
+      - name: Mutation gate
+        run: |
+          set -eu
+          report="${{ runner.temp }}/mulation-report.json"
+          base="HEAD"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+          fi
+          mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
+            --json-out "$report" "$TEST_BINARY"
+          # Always exercise the comment script (dry-run on push; live on PR).
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            MULATION_PR_NUMBER="${{ github.event.pull_request.number }}" \
+            MULATION_REPO="${{ github.repository }}" \
+            GH_TOKEN="${{ github.token }}" \
+              sh scripts/pr-comment-survivors.sh "$report"
+          else
+            MULATION_DRY_RUN=1 sh scripts/pr-comment-survivors.sh "$report"
+          fi

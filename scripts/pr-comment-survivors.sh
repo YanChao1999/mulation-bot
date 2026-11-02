@@ -11,6 +11,7 @@
 #   MULATION_PR_NUMBER   Override PR number
 #   MULATION_REPO        owner/name (default: from gh)
 #   MULATION_MAX_COMMENTS  Cap comments per run (default: 20)
+#   MULATION_DRY_RUN=1   Print planned comments; do not call the API
 set -eu
 
 json=${1:?usage: pr-comment-survivors.sh <mulation-report.json>}
@@ -19,39 +20,45 @@ json=${1:?usage: pr-comment-survivors.sh <mulation-report.json>}
     exit 1
 }
 
-command -v gh >/dev/null || {
-    echo "gh required" >&2
-    exit 1
-}
 command -v jq >/dev/null || {
     echo "jq required" >&2
     exit 1
 }
 
+DRY=${MULATION_DRY_RUN:-0}
 MAX=${MULATION_MAX_COMMENTS:-20}
 REPO=${MULATION_REPO:-}
-
-if [ -z "$REPO" ]; then
-    REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
-fi
-[ -n "$REPO" ] || {
-    echo "set MULATION_REPO=owner/name" >&2
-    exit 1
-}
-
 PR=${MULATION_PR_NUMBER:-}
-if [ -z "$PR" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
-    PR=$(jq -r '.pull_request.number // .number // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
-fi
-if [ -z "$PR" ]; then
-    PR=$(gh pr view --json number -q .number 2>/dev/null || true)
-fi
-[ -n "$PR" ] && [ "$PR" != "null" ] || {
-    echo "no pull request context (set MULATION_PR_NUMBER)" >&2
-    exit 1
-}
+HEAD_SHA=
 
-HEAD_SHA=$(gh api "repos/${REPO}/pulls/${PR}" --jq .head.sha)
+if [ "$DRY" != "1" ]; then
+    command -v gh >/dev/null || {
+        echo "gh required (or set MULATION_DRY_RUN=1)" >&2
+        exit 1
+    }
+    if [ -z "$REPO" ]; then
+        REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
+    fi
+    [ -n "$REPO" ] || {
+        echo "set MULATION_REPO=owner/name" >&2
+        exit 1
+    }
+    if [ -z "$PR" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+        PR=$(jq -r '.pull_request.number // .number // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+    fi
+    if [ -z "$PR" ]; then
+        PR=$(gh pr view --json number -q .number 2>/dev/null || true)
+    fi
+    [ -n "$PR" ] && [ "$PR" != "null" ] || {
+        echo "no pull request context (set MULATION_PR_NUMBER)" >&2
+        exit 1
+    }
+    HEAD_SHA=$(gh api "repos/${REPO}/pulls/${PR}" --jq .head.sha)
+else
+    REPO=${REPO:-dry-run/local}
+    PR=${PR:-0}
+    echo "mulation pr-bot: DRY RUN (no API calls)"
+fi
 
 n=$(jq '.survivors | length' "$json")
 echo "mulation pr-bot: ${n} survivor(s), commenting up to ${MAX} on PR #${PR}"
@@ -100,6 +107,11 @@ Coverage may have hit this line, but no assertion depended on the correct operat
 Strengthen a boundary/contract check (e.g. ages 17 vs 18 for \`>=\` vs \`>\`), then re-run \`mulation --git-diff\`.
 EOF
     )
+
+    if [ "$DRY" = "1" ]; then
+        echo "dry-run would comment ${rel}:${line} [$kinds] $ops"
+        continue
+    fi
 
     # Create a pending review comment via the pulls API (single-line).
     # Ignore failures for paths outside the PR diff (GitHub rejects those).

@@ -126,6 +126,12 @@ test: $(UNIT) $(RUNTIME_TEST) example $(SELF)
 	$(RUNNER) --min-score 0 -j 4 --timeout-ms 2000 $(SELF)
 	@echo "== cli smoke =="
 	sh scripts/run-cli-tests.sh $(RUNNER) $(EXAMPLE)
+	@echo "== pr-bot dry-run =="
+	@report=$$(mktemp); \
+	  $(RUNNER) --min-score 0 -j 2 --json-out $$report $(EXAMPLE) >/dev/null && \
+	  MULATION_DRY_RUN=1 sh scripts/pr-comment-survivors.sh $$report | grep -q 'dry-run would comment' && \
+	  rm -f $$report
+	@echo "[  PASSED  ] pr-bot dry-run"
 
 lint: $(RUNNER) $(UNIT) $(RUNTIME_TEST) tidy
 	@echo "== compiler lint (-Wall -Wextra -Wpedantic -Werror) ok =="

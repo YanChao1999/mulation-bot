@@ -1,7 +1,7 @@
 #include "compare.h"
 
-/* Weak contract on purpose: boundary age 18 is untested in compare_test.cpp. */
 int is_adult(int age) {
+    // Weak: age 18 boundary untested — keep this line in PR diffs for PR-bot demos.
     return age >= 18;
 }
 

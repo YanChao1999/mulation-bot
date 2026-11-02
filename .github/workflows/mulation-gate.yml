@@ -60,12 +60,20 @@ jobs:
           fi
           mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
             --json-out "$report" "$TEST_BINARY"
+          test -f "$report"
           # Always exercise the comment script (dry-run on push; live on PR).
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             MULATION_PR_NUMBER="${{ github.event.pull_request.number }}" \
             MULATION_REPO="${{ github.repository }}" \
             GH_TOKEN="${{ github.token }}" \
-              sh scripts/pr-comment-survivors.sh "$report"
+              sh scripts/pr-comment-survivors.sh "$report" || true
           else
             MULATION_DRY_RUN=1 sh scripts/pr-comment-survivors.sh "$report"
+          fi
+          # If the PR diff has no survivors, dry-run the full example report so CI
+          # still proves the comment path (without requiring a live review thread).
+          if ! grep -q '"survivors":\[{' "$report" 2>/dev/null; then
+            full="${{ runner.temp }}/mulation-full.json"
+            mulation --min-score 0 -j "$JOBS" --json-out "$full" "$TEST_BINARY"
+            MULATION_DRY_RUN=1 sh scripts/pr-comment-survivors.sh "$full" | grep -q 'dry-run would comment'
           fi

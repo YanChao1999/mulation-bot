@@ -81,6 +81,7 @@ jobs:
           fi
           mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
             --json-out "$report" "$TEST_BINARY"
+          test -f "$report"
 
       - name: Comment survivors on PR
         if: always() && github.event_name == 'pull_request'
@@ -100,4 +101,5 @@ jobs:
             "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/pr-comment-survivors.sh" \
             -o /tmp/pr-comment-survivors.sh
           chmod +x /tmp/pr-comment-survivors.sh
-          sh /tmp/pr-comment-survivors.sh "$REPORT"
+          # Non-fatal: GitHub rejects comments on lines outside the PR diff.
+          sh /tmp/pr-comment-survivors.sh "$REPORT" || true

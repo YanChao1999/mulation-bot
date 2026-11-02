@@ -131,7 +131,24 @@ mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
             href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/consumer-template"
             >consumer template</a
           >.
+          On Zephyr, gate
+          <a
+            href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/zephyr-ztest-native"
+            >ZTEST on <code>native_sim</code></a
+          >
+          the same Valgrind-style way.
         </p>
+      </section>
+
+      <section class="band" id="zephyr">
+        <h2>Zephyr + ZTEST</h2>
+        <p class="support">
+          Same gate, different framework: build with Clang on <code>native_sim</code>,
+          keep ZTEST green, wrap the host ELF.
+        </p>
+        <pre class="cmd"><code>west build -b native_sim -d build-native path/to/examples/zephyr-ztest-native
+./build-native/zephyr/zephyr.exe
+mulation --git-diff --min-score 80 -j 4 -- ./build-native/zephyr/zephyr.exe</code></pre>
       </section>
 
       <section class="band definitions">

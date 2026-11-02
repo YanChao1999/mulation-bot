@@ -36,8 +36,9 @@ That pair kills the ROR boundary mutants. Prefer **on/off pairs** at the contrac
 
 ## Workflow
 
-1. Keep unit tests green (`ctest` / gtest).
+1. Keep unit tests green (`ctest` / gtest / Zephyr ZTEST on `native_sim`).
 2. `mulation --git-diff --min-score 80 -- ./build/my_tests`
+   (or `./build/zephyr/zephyr.exe` for Zephyr host tests)
 3. For each survivor on the PR diff: add the smallest assertion that would fail under that operator.
 4. Re-run. Do **not** pad tests only to chase 100% — kill meaningful faults; leave equivalents alone.
 

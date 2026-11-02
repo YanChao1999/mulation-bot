@@ -50,13 +50,13 @@ $(RUNTIME): $(BUILD)/mulation_runtime.o
 	ar rcs $@ $<
 
 $(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -Irunner $(RUNNER_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner $(RUNNER_SRC) -o $@
 
 $(MULATION): $(RUNNER)
 	ln -sfn mulation-run $@
 
 $(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp runner/cli.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -Irunner -Itests $(UNIT_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner -Itests $(UNIT_SRC) -o $@
 
 # Same suite as UNIT; catalog/diff/cli compiled with the pass + runtime (dogfood).
 $(BUILD)/self_catalog.o: runner/catalog.cpp $(PLUGIN) | $(BUILD)
@@ -121,9 +121,9 @@ test: $(UNIT) $(RUNTIME_TEST) example $(SELF)
 	@echo "== elf catalog =="
 	@MULATION_TEST_ELF=$(EXAMPLE) $(UNIT)
 	@echo "== mulation (example) =="
-	$(RUNNER) --min-score 0 $(EXAMPLE)
+	$(RUNNER) --min-score 0 -j 2 $(EXAMPLE)
 	@echo "== mulation (self) =="
-	$(RUNNER) --min-score 0 $(SELF)
+	$(RUNNER) --min-score 0 -j 4 $(SELF)
 	@echo "== cli smoke =="
 	sh scripts/run-cli-tests.sh $(RUNNER) $(EXAMPLE)
 

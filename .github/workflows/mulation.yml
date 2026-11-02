@@ -1,0 +1,163 @@
+# Reusable mutation gate for consumer repos (and this repo).
+#
+# Consumer example:
+#   jobs:
+#     mulation:
+#       uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.1
+#       with:
+#         test-binary: ./build/my_tests
+#         min-score: "80"
+#         comment-survivors: true
+#       permissions:
+#         contents: read
+#         pull-requests: write
+#
+# Requires the test binary already built with Clang + mulation instrumentation
+# (CXX="mulation c++" or -fpass-plugin). This workflow installs a release
+# mulation onto PATH, then runs the campaign.
+
+name: mulation
+
+on:
+  workflow_call:
+    inputs:
+      test-binary:
+        description: Instrumented test binary (or leave empty and set test-command)
+        type: string
+        required: false
+        default: ""
+      test-command:
+        description: Full shell command to wrap (overrides test-binary when set)
+        type: string
+        required: false
+        default: ""
+      min-score:
+        description: Fail if kill rate is below this percent
+        type: string
+        required: false
+        default: "80"
+      git-diff:
+        description: Only mutants on lines changed vs base (PR-friendly)
+        type: boolean
+        required: false
+        default: true
+      git-base:
+        description: Diff base for --git-diff (default: merge base with default branch)
+        type: string
+        required: false
+        default: ""
+      mulation-version:
+        description: Release tag to install (e.g. v0.0.1); empty = latest
+        type: string
+        required: false
+        default: "v0.0.1"
+      comment-survivors:
+        description: Post PR review comments for survived mutants
+        type: boolean
+        required: false
+        default: true
+      max-comments:
+        description: Cap on PR comments per run
+        type: string
+        required: false
+        default: "20"
+      jobs:
+        description: Parallel mutant workers (-j)
+        type: string
+        required: false
+        default: "4"
+    secrets:
+      # Optional; default GITHUB_TOKEN is used for PR comments when granted.
+      token:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  gate:
+    name: mutation gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang 18 (host needs LLVM for the pass plugin)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18 jq
+
+      - name: Install mulation from release
+        env:
+          MULATION_VERSION: ${{ inputs.mulation-version }}
+          PREFIX: ${{ runner.temp }}/mulation-prefix
+        run: |
+          set -eu
+          curl -fsSL "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/install.sh" | sh
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "PATH=${PREFIX}/bin:$PATH" >> "$GITHUB_ENV"
+          "${PREFIX}/bin/mulation" --help >/dev/null
+
+      - name: Resolve git-diff base
+        id: base
+        if: inputs.git-diff
+        run: |
+          set -eu
+          if [ -n "${{ inputs.git-base }}" ]; then
+            echo "ref=${{ inputs.git-base }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=HEAD~1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run mulation
+        id: run
+        env:
+          TEST_BIN: ${{ inputs.test-binary }}
+          TEST_CMD: ${{ inputs.test-command }}
+          MIN_SCORE: ${{ inputs.min-score }}
+          GIT_DIFF: ${{ inputs.git-diff }}
+          GIT_BASE: ${{ steps.base.outputs.ref }}
+          JOBS: ${{ inputs.jobs }}
+        run: |
+          set -eu
+          report="${{ runner.temp }}/mulation-report.json"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+          args="--min-score ${MIN_SCORE} --json-out ${report} -j ${JOBS}"
+          if [ "${GIT_DIFF}" = "true" ]; then
+            args="${args} --git-diff=${GIT_BASE}"
+          fi
+          if [ -n "${TEST_CMD}" ]; then
+            # shellcheck disable=SC2086
+            mulation $args -- ${TEST_CMD}
+          elif [ -n "${TEST_BIN}" ]; then
+            # shellcheck disable=SC2086
+            mulation $args "${TEST_BIN}"
+          else
+            echo "set test-binary or test-command" >&2
+            exit 2
+          fi
+
+      - name: Comment survived mutants on PR
+        if: always() && inputs.comment-survivors && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.token || github.token }}
+          MULATION_PR_NUMBER: ${{ github.event.pull_request.number }}
+          MULATION_REPO: ${{ github.repository }}
+          MULATION_MAX_COMMENTS: ${{ inputs.max-comments }}
+          REPORT: ${{ runner.temp }}/mulation-report.json
+          MULATION_VERSION: ${{ inputs.mulation-version }}
+        run: |
+          set -eu
+          if [ ! -f "$REPORT" ]; then
+            echo "no report at $REPORT; skip comments"
+            exit 0
+          fi
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/pr-comment-survivors.sh" \
+            -o /tmp/pr-comment-survivors.sh
+          chmod +x /tmp/pr-comment-survivors.sh
+          sh /tmp/pr-comment-survivors.sh "$REPORT"

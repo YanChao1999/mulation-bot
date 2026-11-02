@@ -16,6 +16,7 @@ std::string usage_text(const char *argv0) {
         << "  --min-score N       Fail if kill rate is below N percent (CI gate)\n"
         << "  --git-diff [BASE]   Only mutants on lines changed vs BASE (default HEAD)\n"
         << "  --timeout-ms N      Per-mutant timeout (default: 5x baseline + 1000ms)\n"
+        << "  -j, --jobs N        Parallel mutant workers (default: 1)\n"
         << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
         << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
         << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
@@ -99,6 +100,25 @@ ParseResult parse_args(int argc, char **argv) {
                 return r;
             }
             o.timeout_ms = std::atoi(argv[++i]);
+            ++i;
+            continue;
+        }
+        if (a == "-j" || a == "--jobs") {
+            if (!need(a.c_str())) {
+                return r;
+            }
+            o.jobs = std::atoi(argv[++i]);
+            if (o.jobs < 1) {
+                return err(argv0, "mulation: --jobs must be >= 1");
+            }
+            ++i;
+            continue;
+        }
+        if (a.rfind("--jobs=", 0) == 0) {
+            o.jobs = std::atoi(a.c_str() + 7);
+            if (o.jobs < 1) {
+                return err(argv0, "mulation: --jobs must be >= 1");
+            }
             ++i;
             continue;
         }

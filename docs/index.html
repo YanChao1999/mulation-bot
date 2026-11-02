@@ -90,9 +90,10 @@ TEST(Adult, TwentyIsAdult)   still PASS
 
   [survived]  compare.cpp:4  [ROR] &gt;= -&gt; &gt;
   [survived]  compare.cpp:8  [ROR] &gt;  -&gt; &gt;=
+  [survived]  compare.cpp:12 [AOR] +  -&gt; *   # 2+2 and 2*2 both equal 4
   [killed]    compare.cpp:12 [AOR] +  -&gt; -
 
-score: 33%   ← coverage said 100%; mutation said the suite is weak</code></pre>
+score: ~62%  ← denser operators; boundary still open; coverage still lied</code></pre>
       </section>
 
       <section class="band" id="get-started">
@@ -121,6 +122,10 @@ mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
           Prefer a tarball? Grab
           <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
           or pin <code>MULATION_VERSION=v0.0.1</code> when running the script.
+          Survived a mutant?
+          <a href="https://github.com/YanChao1999/mulation-bot/blob/main/docs/weak-to-strong.md"
+            >Weak → strong guide</a
+          >.
         </p>
       </section>
 

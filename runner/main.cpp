@@ -4,14 +4,17 @@
 #include "process.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <libgen.h>
 #include <map>
+#include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -287,37 +290,98 @@ int main(int argc, char **argv) {
     int killed = 0, survived = 0, timeout_n = 0;
     std::vector<Mutant> survivors;
     std::vector<Mutant> uncovered;
+    std::vector<const Mutant *> todo;
+    todo.reserve(mutants.size());
 
     std::cout << "mulation: " << mutants.size() << " mutants";
     if (!covered.empty()) {
         std::cout << ", " << covered.size() << " sites hit by tests";
     }
+    const int jobs = std::max(1, opt.jobs);
+    if (jobs > 1) {
+        std::cout << ", jobs=" << jobs;
+    }
     std::cout << "\n";
 
-    int idx = 0;
     for (const Mutant &m : mutants) {
-        ++idx;
         if (!opt.no_coverage && !covered.empty() && !covered.count(m.id)) {
             uncovered.push_back(m);
             continue;
         }
-        std::map<std::string, std::string> env{{"MULATION_MUTANT", std::to_string(m.id)}};
-        RunResult rr = run_command(opt.cmd, env, timeout);
+        todo.push_back(&m);
+    }
+
+    struct Outcome {
+        size_t order = 0;
+        const Mutant *m = nullptr;
         const char *cls = "survived";
-        if (rr.status == RunStatus::Timeout) {
-            cls = "timeout";
+        bool is_killed = false;
+        bool is_timeout = false;
+        bool is_survived = false;
+    };
+    std::vector<Outcome> outcomes(todo.size());
+    std::atomic<size_t> next{0};
+    std::mutex print_mu;
+
+    auto worker = [&]() {
+        while (true) {
+            size_t i = next.fetch_add(1);
+            if (i >= todo.size()) {
+                break;
+            }
+            const Mutant *m = todo[i];
+            std::map<std::string, std::string> env{{"MULATION_MUTANT", std::to_string(m->id)}};
+            RunResult rr = run_command(opt.cmd, env, timeout);
+            Outcome o;
+            o.order = i;
+            o.m = m;
+            if (rr.status == RunStatus::Timeout) {
+                o.cls = "timeout";
+                o.is_timeout = true;
+                o.is_killed = true;
+            } else if (rr.status == RunStatus::Pass) {
+                o.cls = "survived";
+                o.is_survived = true;
+            } else {
+                o.cls = "killed";
+                o.is_killed = true;
+            }
+            outcomes[i] = o;
+            std::lock_guard<std::mutex> lock(print_mu);
+            std::cout << "  [" << (i + 1) << "/" << todo.size() << "] " << o.cls << "  " << m->file
+                      << ":" << m->line << "  [" << m->kind << "] " << m->op << " -> " << m->mut
+                      << "\n";
+        }
+    };
+
+    if (jobs == 1 || todo.size() <= 1) {
+        worker();
+    } else {
+        const size_t n = std::min(static_cast<size_t>(jobs), todo.size());
+        std::vector<std::thread> pool;
+        pool.reserve(n);
+        for (size_t t = 0; t < n; ++t) {
+            pool.emplace_back(worker);
+        }
+        for (auto &th : pool) {
+            th.join();
+        }
+    }
+
+    for (const Outcome &o : outcomes) {
+        if (!o.m) {
+            continue;
+        }
+        if (o.is_timeout) {
             ++timeout_n;
-            ++killed;
-        } else if (rr.status == RunStatus::Pass) {
-            cls = "survived";
-            ++survived;
-            survivors.push_back(m);
-        } else {
-            cls = "killed";
+        }
+        if (o.is_killed) {
             ++killed;
         }
-        std::cout << "  [" << idx << "/" << mutants.size() << "] " << cls << "  " << m.file << ":"
-                  << m.line << "  [" << m.kind << "] " << m.op << " -> " << m.mut << "\n";
+        if (o.is_survived) {
+            ++survived;
+            survivors.push_back(*o.m);
+        }
     }
 
     survived += static_cast<int>(uncovered.size());

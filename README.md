@@ -18,10 +18,12 @@ Coverage says a line **ran**. Mutation says: if that line were **faulty**, a tes
 Keep campaigns cheap: only mutants on the PR/worktree diff, fail if the score is too low.
 
 ```bash
-mulation --git-diff --min-score 80 -- ./build/my_tests
+mulation --git-diff --min-score 80 -j 4 -- ./build/my_tests
 # or
-mulation --git-diff --min-score 80 -- ctest --test-dir build
+mulation --git-diff --min-score 80 -j 4 -- ctest --test-dir build
 ```
+
+`-j` / `--jobs N` runs mutant replays in parallel (default `1`).
 
 Wire that after a green `ctest` / gtest run. Full-suite mutation without `--git-diff` is usually too slow for every PR.
 
@@ -135,10 +137,31 @@ The tool does not invent per-operator advice. Survived lines are locations for y
 
 ## Mutation operators (MVP)
 
-- **AOR** — `+`/`-`, `*`/`/`, `%`
-- **ROR** — `<`/`<=`/`>`/`>=`/`==`/`!=`
+- **AOR** — `+`/`-`/`*`/`/`/`%` with dual + one cross-family alternative (e.g. `+`→`-` and `+`→`*`)
+- **ROR** — `<`/`<=`/`>`/`>=`/`==`/`!=` with boundary flip, opposite relational, and equality
 - **BOR** — bitwise `&`/`|` (non-i1 LLVM `and`/`or`)
 - **LCR** — i1 `and`/`or` (source `&&`/`||` is often control flow and may not appear as a binop)
+- **LVR** — integer literals `0`↔`1`
+
+Prefer `--git-diff` so the denser operator set stays cheap on PRs.
+
+## GitHub Actions reusable gate
+
+```yaml
+jobs:
+  mulation:
+    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.1
+    with:
+      test-binary: ./build/my_tests   # already built with mulation c++
+      min-score: "80"
+      git-diff: true
+      comment-survivors: true         # PR review comments on survived lines
+    permissions:
+      contents: read
+      pull-requests: write
+```
+
+See [docs/weak-to-strong.md](docs/weak-to-strong.md) for turning survivors into stronger assertions.
 
 ## Limitations (why you might not use this yet)
 
@@ -170,6 +193,6 @@ make test
 - `tests/` — unit suite for catalog, git-diff, process, cli, runtime; also drives self-mutation
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
-- `docs/` — GitHub Pages site
-- `scripts/` — format, tidy, install, install-smoke, package-release
-- `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`
+- `docs/` — GitHub Pages site + weak-to-strong guide
+- `scripts/` — format, tidy, install, install-smoke, package-release, pr-comment-survivors
+- `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`, reusable `mulation.yml`

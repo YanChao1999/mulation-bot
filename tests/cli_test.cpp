@@ -73,3 +73,15 @@ TEST(Cli, DoubleDashCollectsCommand) {
     CHECK_EQ(r.options.cmd[0], std::string("ctest"));
     CHECK_EQ(r.options.cmd[2], std::string("build"));
 }
+
+TEST(Cli, JobsFlag) {
+    ParseResult a = parse({"-j", "4", "./t"});
+    CHECK_EQ(static_cast<int>(a.kind), static_cast<int>(ParseKind::Ok));
+    CHECK_EQ(a.options.jobs, 4);
+
+    ParseResult b = parse({"--jobs=8", "./t"});
+    CHECK_EQ(b.options.jobs, 8);
+
+    ParseResult c = parse({"--jobs", "0", "./t"});
+    CHECK_EQ(static_cast<int>(c.kind), static_cast<int>(ParseKind::Error));
+}

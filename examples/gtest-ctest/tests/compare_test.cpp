@@ -18,15 +18,16 @@ TEST(Max, Unequal) {
     EXPECT_EQ(max2(5, 3), 5);
 }
 
-/* Strong enough to kill `+` -> `-`. */
+/* Kills `+` -> `-`, but `+` -> `*` still survives (2*2 == 4). */
 TEST(Add, TwoPlusTwo) {
     EXPECT_EQ(add2(2, 2), 4);
 }
 
 /*
- * Uncomment to kill the surviving `>=` -> `>` mutant:
+ * Uncomment to kill surviving boundary / arithmetic mutants:
  *   TEST(Adult, Boundary) {
  *     EXPECT_TRUE(is_adult(18));
  *     EXPECT_FALSE(is_adult(17));
  *   }
+ *   TEST(Add, ThreePlusOne) { EXPECT_EQ(add2(3, 1), 4); }  // kills + -> *
  */

@@ -161,40 +161,66 @@ static const char *predName(CmpInst::Predicate P) {
     }
 }
 
-static bool pairPred(CmpInst::Predicate P, CmpInst::Predicate &Out) {
+// High-value ROR set: boundary flip, opposite relational, and equality (where useful).
+static void appendPreds(CmpInst::Predicate P, std::vector<CmpInst::Predicate> &Out) {
+    auto add = [&](CmpInst::Predicate Q) {
+        if (Q != P) {
+            Out.push_back(Q);
+        }
+    };
     switch (P) {
     case CmpInst::ICMP_EQ:
-        Out = CmpInst::ICMP_NE;
-        return true;
+        add(CmpInst::ICMP_NE);
+        add(CmpInst::ICMP_SLT);
+        add(CmpInst::ICMP_SGT);
+        break;
     case CmpInst::ICMP_NE:
-        Out = CmpInst::ICMP_EQ;
-        return true;
+        add(CmpInst::ICMP_EQ);
+        add(CmpInst::ICMP_SLE);
+        add(CmpInst::ICMP_SGE);
+        break;
     case CmpInst::ICMP_SGT:
-        Out = CmpInst::ICMP_SGE;
-        return true;
+        add(CmpInst::ICMP_SGE);
+        add(CmpInst::ICMP_SLT);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_SGE:
-        Out = CmpInst::ICMP_SGT;
-        return true;
+        add(CmpInst::ICMP_SGT);
+        add(CmpInst::ICMP_SLE);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_SLT:
-        Out = CmpInst::ICMP_SLE;
-        return true;
+        add(CmpInst::ICMP_SLE);
+        add(CmpInst::ICMP_SGT);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_SLE:
-        Out = CmpInst::ICMP_SLT;
-        return true;
+        add(CmpInst::ICMP_SLT);
+        add(CmpInst::ICMP_SGE);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_UGT:
-        Out = CmpInst::ICMP_UGE;
-        return true;
+        add(CmpInst::ICMP_UGE);
+        add(CmpInst::ICMP_ULT);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_UGE:
-        Out = CmpInst::ICMP_UGT;
-        return true;
+        add(CmpInst::ICMP_UGT);
+        add(CmpInst::ICMP_ULE);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_ULT:
-        Out = CmpInst::ICMP_ULE;
-        return true;
+        add(CmpInst::ICMP_ULE);
+        add(CmpInst::ICMP_UGT);
+        add(CmpInst::ICMP_EQ);
+        break;
     case CmpInst::ICMP_ULE:
-        Out = CmpInst::ICMP_ULT;
-        return true;
+        add(CmpInst::ICMP_ULT);
+        add(CmpInst::ICMP_UGE);
+        add(CmpInst::ICMP_EQ);
+        break;
     default:
-        return false;
+        break;
     }
 }
 
@@ -224,47 +250,56 @@ static const char *binName(Instruction::BinaryOps Op, Type *Ty) {
     }
 }
 
-static bool pairBin(Instruction::BinaryOps Op, Type *Ty, Instruction::BinaryOps &Out,
-                    const char *&Kind) {
+struct BinMut {
+    Instruction::BinaryOps op;
+    const char *kind;
+};
+
+// AOR: keep the classic dual and one cross-family high-kill alternative.
+static void appendBins(Instruction::BinaryOps Op, Type *Ty, std::vector<BinMut> &Out) {
+    const bool i1 = Ty && Ty->isIntegerTy(1);
+    auto add = [&](Instruction::BinaryOps Q, const char *kind) {
+        if (Q != Op) {
+            Out.push_back({Q, kind});
+        }
+    };
     switch (Op) {
     case Instruction::Add:
-        Out = Instruction::Sub;
-        Kind = "AOR";
-        return true;
+        add(Instruction::Sub, "AOR");
+        add(Instruction::Mul, "AOR");
+        break;
     case Instruction::Sub:
-        Out = Instruction::Add;
-        Kind = "AOR";
-        return true;
+        add(Instruction::Add, "AOR");
+        add(Instruction::Mul, "AOR");
+        break;
     case Instruction::Mul:
-        Out = Instruction::SDiv;
-        Kind = "AOR";
-        return true;
+        add(Instruction::SDiv, "AOR");
+        add(Instruction::Add, "AOR");
+        break;
     case Instruction::SDiv:
-        Out = Instruction::Mul;
-        Kind = "AOR";
-        return true;
+        add(Instruction::Mul, "AOR");
+        add(Instruction::Sub, "AOR");
+        break;
     case Instruction::UDiv:
-        Out = Instruction::Mul;
-        Kind = "AOR";
-        return true;
+        add(Instruction::Mul, "AOR");
+        add(Instruction::Sub, "AOR");
+        break;
     case Instruction::SRem:
-        Out = Instruction::SDiv;
-        Kind = "AOR";
-        return true;
+        add(Instruction::SDiv, "AOR");
+        add(Instruction::Mul, "AOR");
+        break;
     case Instruction::URem:
-        Out = Instruction::UDiv;
-        Kind = "AOR";
-        return true;
+        add(Instruction::UDiv, "AOR");
+        add(Instruction::Mul, "AOR");
+        break;
     case Instruction::And:
-        Out = Instruction::Or;
-        Kind = (Ty && Ty->isIntegerTy(1)) ? "LCR" : "BOR";
-        return true;
+        add(Instruction::Or, i1 ? "LCR" : "BOR");
+        break;
     case Instruction::Or:
-        Out = Instruction::And;
-        Kind = (Ty && Ty->isIntegerTy(1)) ? "LCR" : "BOR";
-        return true;
+        add(Instruction::And, i1 ? "LCR" : "BOR");
+        break;
     default:
-        return false;
+        break;
     }
 }
 
@@ -382,9 +417,9 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
         bool changed = false;
 
         for (BinaryOperator *BO : bins) {
-            Instruction::BinaryOps mutOp;
-            const char *kind = nullptr;
-            if (!pairBin(BO->getOpcode(), BO->getType(), mutOp, kind)) {
+            std::vector<BinMut> alts;
+            appendBins(BO->getOpcode(), BO->getType(), alts);
+            if (alts.empty()) {
                 continue;
             }
             std::string file;
@@ -393,24 +428,39 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
                 continue;
             }
             const char *opN = binName(BO->getOpcode(), BO->getType());
-            const char *mutN = binName(mutOp, BO->getType());
-            uint32_t id = idFor(BO, file, line, col, kind, opN, mutN);
-
             IRBuilder<> B(insertAfterPoint(BO));
             B.SetCurrentDebugLocation(BO->getDebugLoc());
-            Value *MutV =
-                B.CreateBinOp(mutOp, BO->getOperand(0), BO->getOperand(1), "mulation.mut");
-            Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
-            Value *Sel = B.CreateSelect(Cond, MutV, BO, "mulation.sel");
-            BO->replaceUsesWithIf(
-                Sel, [&](Use &U) { return U.getUser() != MutV && U.getUser() != Sel; });
-            recs.push_back(makeRec(id, file, line, col, kind, opN, mutN));
-            changed = true;
+            Value *Cur = BO;
+            std::vector<Value *> chain;
+            for (const BinMut &alt : alts) {
+                const char *mutN = binName(alt.op, BO->getType());
+                uint32_t id = idFor(BO, file, line, col, alt.kind, opN, mutN);
+                Value *MutV =
+                    B.CreateBinOp(alt.op, BO->getOperand(0), BO->getOperand(1), "mulation.mut");
+                Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
+                Value *Sel = B.CreateSelect(Cond, MutV, Cur, "mulation.sel");
+                chain.push_back(MutV);
+                chain.push_back(Cond);
+                chain.push_back(Sel);
+                Cur = Sel;
+                recs.push_back(makeRec(id, file, line, col, alt.kind, opN, mutN));
+                changed = true;
+            }
+            BO->replaceUsesWithIf(Cur, [&](Use &U) {
+                Value *user = U.getUser();
+                for (Value *V : chain) {
+                    if (user == V) {
+                        return false;
+                    }
+                }
+                return true;
+            });
         }
 
         for (ICmpInst *IC : cmps) {
-            CmpInst::Predicate mutP;
-            if (!pairPred(IC->getPredicate(), mutP)) {
+            std::vector<CmpInst::Predicate> alts;
+            appendPreds(IC->getPredicate(), alts);
+            if (alts.empty()) {
                 continue;
             }
             std::string file;
@@ -419,18 +469,33 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
                 continue;
             }
             const char *opN = predName(IC->getPredicate());
-            const char *mutN = predName(mutP);
-            uint32_t id = idFor(IC, file, line, col, "ROR", opN, mutN);
-
             IRBuilder<> B(insertAfterPoint(IC));
             B.SetCurrentDebugLocation(IC->getDebugLoc());
-            Value *MutV = B.CreateICmp(mutP, IC->getOperand(0), IC->getOperand(1), "mulation.mut");
-            Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
-            Value *Sel = B.CreateSelect(Cond, MutV, IC, "mulation.sel");
-            IC->replaceUsesWithIf(
-                Sel, [&](Use &U) { return U.getUser() != MutV && U.getUser() != Sel; });
-            recs.push_back(makeRec(id, file, line, col, "ROR", opN, mutN));
-            changed = true;
+            Value *Cur = IC;
+            std::vector<Value *> chain;
+            for (CmpInst::Predicate mutP : alts) {
+                const char *mutN = predName(mutP);
+                uint32_t id = idFor(IC, file, line, col, "ROR", opN, mutN);
+                Value *MutV =
+                    B.CreateICmp(mutP, IC->getOperand(0), IC->getOperand(1), "mulation.mut");
+                Value *Cond = B.CreateCall(Active, {B.getInt32(id)}, "mulation.on");
+                Value *Sel = B.CreateSelect(Cond, MutV, Cur, "mulation.sel");
+                chain.push_back(MutV);
+                chain.push_back(Cond);
+                chain.push_back(Sel);
+                Cur = Sel;
+                recs.push_back(makeRec(id, file, line, col, "ROR", opN, mutN));
+                changed = true;
+            }
+            IC->replaceUsesWithIf(Cur, [&](Use &U) {
+                Value *user = U.getUser();
+                for (Value *V : chain) {
+                    if (user == V) {
+                        return false;
+                    }
+                }
+                return true;
+            });
         }
 
         for (auto [I, oi] : lits) {

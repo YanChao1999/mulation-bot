@@ -10,6 +10,7 @@ struct Options {
     bool git_diff = false;
     std::string git_base = "HEAD";
     int timeout_ms = 0;
+    int jobs = 1;
     bool no_coverage = false;
     std::string catalog_dir;
     std::string json_out;

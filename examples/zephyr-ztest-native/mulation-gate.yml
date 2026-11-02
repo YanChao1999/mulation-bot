@@ -1,0 +1,71 @@
+# Snippet for Zephyr + ZTEST (native_sim). Copy into your repo as
+# .github/workflows/mulation-gate.yml and adjust west paths.
+#
+# Full consumer template (gtest-style): ../consumer-template/mulation-gate.yml
+
+name: mulation-gate-zephyr
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TEST_BINARY: ./build-native/zephyr/zephyr.exe
+  MIN_SCORE: "0"
+  MULATION_VERSION: v0.0.3
+  JOBS: "4"
+  # ZEPHYR_BASE must be available on the runner (cached SDK / west workspace).
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang 18 + jq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18 jq
+
+      - name: Install mulation
+        env:
+          PREFIX: ${{ runner.temp }}/mulation-prefix
+        run: |
+          set -eu
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/install.sh" \
+            | sh
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+
+      - name: West build native_sim (instrumented SUT)
+        # Replace with your workspace bootstrap (west init/update, ZEPHYR_BASE).
+        run: |
+          set -eu
+          echo "Example:"
+          echo "  export ZEPHYR_TOOLCHAIN_VARIANT=llvm"
+          echo "  west build -p always -b native_sim -d build-native examples/zephyr-ztest-native"
+          echo "This job is a template — enable when the runner has a Zephyr workspace."
+          exit 0
+
+      - name: ZTEST must stay green
+        if: false  # enable when TEST_BINARY exists
+        run: "$TEST_BINARY"
+
+      - name: Mutation gate
+        if: false
+        run: |
+          set -eu
+          report="${{ runner.temp }}/mulation-report.json"
+          base="HEAD"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+          fi
+          mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
+            --json-out "$report" "$TEST_BINARY"

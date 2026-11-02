@@ -187,6 +187,9 @@ See [docs/weak-to-strong.md](docs/weak-to-strong.md) for turning survivors into 
 
 `examples/gtest-ctest/` is a demo green suite with a weak boundary (surviving `>=` → `>`). It is not special-cased in the runner; any instrumented test binary works the same way.
 
+**Zephyr / ZTEST:** use a host `native_sim` binary the same way — see
+[`examples/zephyr-ztest-native/`](examples/zephyr-ztest-native/) (Clang toolchain, instrument SUT only, then `mulation ./build/zephyr/zephyr.exe`).
+
 The same idea applies to **mulation-bot itself**: `make test` scores an instrumented runner-library binary (`build/mulation_self_tests`: catalog/diff + matching unit tests). Report the score; do not invent stronger cases only to kill mutants. Process and CLI stay uninstrumented in the self binary (loop-index mutants hang and flood timeouts into the score).
 
 ```bash
@@ -205,6 +208,7 @@ make test
 - `tests/` — unit suite for catalog, git-diff, process, cli, runtime; also drives self-mutation
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
+- `examples/zephyr-ztest-native/` — Zephyr ZTEST on `native_sim` + mulation wiring
 - `examples/consumer-template/` — copy-paste GitHub Actions gate + PR comments
 - `docs/` — GitHub Pages site + weak-to-strong guide
 - `scripts/` — format, tidy, install, install-smoke, package-release, pr-comment-survivors

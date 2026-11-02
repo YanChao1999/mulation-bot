@@ -17,10 +17,10 @@ QEMU / hardware targets are out of scope for this MVP (cross-plugin + per-mutant
 
 - Zephyr SDK / workspace (`ZEPHYR_BASE`)
 - **LLVM/Clang 18** as the Zephyr toolchain (`ZEPHYR_TOOLCHAIN_VARIANT=llvm` or equivalent)
-- mulation installed ([install.sh](https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.3/install.sh))
+- mulation installed ([install.sh](https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh))
 
 ```bash
-curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.3/install.sh | sh
+curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 

@@ -17,7 +17,7 @@ permissions:
 env:
   TEST_BINARY: ./build-native/zephyr/zephyr.exe
   MIN_SCORE: "0"
-  MULATION_VERSION: v0.0.3
+  MULATION_VERSION: v0.0.4
   JOBS: "4"
   # ZEPHYR_BASE must be available on the runner (cached SDK / west workspace).
 

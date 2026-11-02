@@ -112,7 +112,7 @@ mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
           Linux x86_64 release + Clang/LLVM 18. One command installs to
           <code>$HOME/.local</code>; instrument the SUT once, flip mutants at runtime.
         </p>
-        <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.2/install.sh | sh
+        <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.3/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
 CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build
@@ -121,7 +121,7 @@ mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
         <p class="support">
           Prefer a tarball? Grab
           <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
-          or pin <code>MULATION_VERSION=v0.0.2</code> when running the script.
+          or pin <code>MULATION_VERSION=v0.0.3</code> when running the script.
           Survived a mutant?
           <a href="https://github.com/YanChao1999/mulation-bot/blob/main/docs/weak-to-strong.md"
             >Weak → strong guide</a

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install mulation-bot from a GitHub Release tarball into PREFIX (default: $HOME/.local).
 #
-#   curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh
+#   curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh
 #
 # Environment:
 #   MULATION_VERSION  Release tag (default: latest), e.g. v0.0.1
@@ -13,9 +13,17 @@ REPO=${MULATION_REPO:-YanChao1999/mulation-bot}
 PREFIX=${PREFIX:-${HOME}/.local}
 VERSION=${MULATION_VERSION:-}
 
+GITHUB_API="https://api.github.com"
+CURL_FLAGS="-fsSL -H Accept:application/vnd.github+json -H User-Agent:mulation-install"
+
 fail() {
     echo "mulation install: $*" >&2
     exit 1
+}
+
+gh_curl() {
+    # shellcheck disable=SC2086
+    curl $CURL_FLAGS "$@"
 }
 
 need_cmd() {
@@ -40,11 +48,13 @@ need_cmd cp
 
 if [ -z "$VERSION" ]; then
     VERSION=$(
-        curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" |
+        gh_curl "${GITHUB_API}/repos/${REPO}/releases/latest" |
             sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
             head -n 1
     )
-    [ -n "$VERSION" ] || fail "could not resolve latest release for ${REPO}"
+    if [ -z "$VERSION" ]; then
+        fail "could not resolve latest release for ${REPO} (no release yet, or GitHub API blocked — set MULATION_VERSION=v0.0.1)"
+    fi
 fi
 
 ver="${VERSION#v}"
@@ -57,9 +67,9 @@ work=$(mktemp -d /tmp/mulation-install-XXXXXX)
 trap 'rm -rf "$work"' EXIT
 
 echo "== mulation install: ${VERSION} -> ${PREFIX} =="
-curl -fsSL "$tarball" -o "$work/${pkg}.tar.gz"
+gh_curl "$tarball" -o "$work/${pkg}.tar.gz"
 
-if curl -fsSL "$sha_url" -o "$work/${pkg}.sha256" 2>/dev/null; then
+if gh_curl "$sha_url" -o "$work/${pkg}.sha256" 2>/dev/null; then
     (
         cd "$work"
         sha256sum -c "${pkg}.sha256"

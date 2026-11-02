@@ -30,14 +30,14 @@ Wire that after a green `ctest` / gtest run. Full-suite mutation without `--git-
 One command (Linux x86_64, installs to `$HOME/.local`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh
+curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Pin a version or prefix:
 
 ```bash
-MULATION_VERSION=v0.0.1 PREFIX=$HOME/.local sh -c 'curl -fsSL https://raw.githubusercontent.com/YanChao1999/mulation-bot/v0.0.1/scripts/install.sh | sh'
+MULATION_VERSION=v0.0.1 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh'
 ```
 
 Manual install from the release tarball:

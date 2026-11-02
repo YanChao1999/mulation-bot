@@ -1,0 +1,105 @@
+# Copy to: .github/workflows/mulation-gate.yml
+#
+# Single-job consumer template: install mulation → you build → gate → PR comments.
+# Replace the "Build instrumented tests" step with your project's real build.
+
+name: mulation-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # --- edit these ---
+  TEST_BINARY: ./build/compare_tests
+  MIN_SCORE: "0"          # raise to 80 once the suite is strong enough
+  MULATION_VERSION: v0.0.3
+  JOBS: "4"
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang 18
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18 jq
+
+      - name: Install mulation
+        env:
+          PREFIX: ${{ runner.temp }}/mulation-prefix
+        run: |
+          set -eu
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/install.sh" \
+            | sh
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+          "${PREFIX}/bin/mulation" --help >/dev/null
+
+      - name: Build instrumented tests
+        # Example only — replace with your cmake/ninja/bazel build.
+        # Product code must go through mulation c++ / -fpass-plugin.
+        run: |
+          set -eu
+          echo "Replace this step with your instrumented build, e.g.:"
+          echo '  CXX="mulation c++" CC="mulation cc" cmake -B build && cmake --build build'
+          echo "For the mulation-bot repo itself we build the bundled example:"
+          make example
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+
+      - name: Unit tests must stay green
+        run: |
+          set -eu
+          if [ -x "$TEST_BINARY" ]; then
+            "$TEST_BINARY"
+          else
+            echo "missing TEST_BINARY=$TEST_BINARY" >&2
+            exit 1
+          fi
+
+      - name: Mutation gate
+        id: mut
+        run: |
+          set -eu
+          report="${{ runner.temp }}/mulation-report.json"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+          base="HEAD"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+          fi
+          mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
+            --json-out "$report" "$TEST_BINARY"
+          test -f "$report"
+
+      - name: Comment survivors on PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MULATION_PR_NUMBER: ${{ github.event.pull_request.number }}
+          MULATION_REPO: ${{ github.repository }}
+          MULATION_MAX_COMMENTS: "20"
+          REPORT: ${{ runner.temp }}/mulation-report.json
+        run: |
+          set -eu
+          if [ ! -f "$REPORT" ]; then
+            echo "no report; skip comments"
+            exit 0
+          fi
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/pr-comment-survivors.sh" \
+            -o /tmp/pr-comment-survivors.sh
+          chmod +x /tmp/pr-comment-survivors.sh
+          # Non-fatal: GitHub rejects comments on lines outside the PR diff.
+          sh /tmp/pr-comment-survivors.sh "$REPORT" || true

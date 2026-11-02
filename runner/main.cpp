@@ -250,6 +250,11 @@ int main(int argc, char **argv) {
         if (mutants.empty()) {
             std::cout << "mulation: no mutants on git diff vs " << opt.git_base
                       << "; nothing to prove.\n";
+            if (!opt.json_out.empty()) {
+                std::ofstream js(opt.json_out);
+                js << "{\"killed\":0,\"survived\":0,\"timeout\":0,\"score\":100,\"survivors\":[]}"
+                      "\n";
+            }
             return 0;
         }
     }

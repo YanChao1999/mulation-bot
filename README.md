@@ -148,7 +148,16 @@ The tool does not invent per-operator advice. Survived lines are locations for y
 
 Prefer `--git-diff` so the denser operator set stays cheap on PRs.
 
-## GitHub Actions reusable gate
+## GitHub Actions gate (copy-paste)
+
+Fastest path for a new repo: copy the single-job template
+
+[`examples/consumer-template/mulation-gate.yml`](examples/consumer-template/mulation-gate.yml)
+→ `.github/workflows/mulation-gate.yml`, then edit `TEST_BINARY` / `MIN_SCORE`.
+
+Guide: [`examples/consumer-template/README.md`](examples/consumer-template/README.md).
+
+Reusable workflow (when the instrumented binary is already built in a prior job):
 
 ```yaml
 jobs:
@@ -196,6 +205,7 @@ make test
 - `tests/` — unit suite for catalog, git-diff, process, cli, runtime; also drives self-mutation
 - `cmake/` — `Mulation.cmake`, ClangTools
 - `examples/gtest-ctest/` — sample SUT + gtest-style tests
+- `examples/consumer-template/` — copy-paste GitHub Actions gate + PR comments
 - `docs/` — GitHub Pages site + weak-to-strong guide
 - `scripts/` — format, tidy, install, install-smoke, package-release, pr-comment-survivors
-- `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`, reusable `mulation.yml`
+- `.github/workflows/` — `ci.yml`, `release.yml`, `pages.yml`, `mulation-gate.yml`, reusable `mulation.yml`

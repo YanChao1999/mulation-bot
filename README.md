@@ -32,14 +32,14 @@ Wire that after a green `ctest` / gtest run. Full-suite mutation without `--git-
 One command (Linux x86_64, installs to `$HOME/.local`):
 
 ```bash
-curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh
+curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.2/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Pin a version or prefix:
 
 ```bash
-MULATION_VERSION=v0.0.1 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh'
+MULATION_VERSION=v0.0.2 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.2/install.sh | sh'
 ```
 
 Manual install from the release tarball:
@@ -106,7 +106,7 @@ Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
 
 `make test` dogfoods the tool: an instrumented `mulation_self_tests` binary (runner library + existing unit suite) is scored with `mulation-run --min-score 0`. Do not pad unit assertions just to raise that score — survivors are the signal.
 
-Publish a release: push a tag `v0.0.1` (workflow builds, tests, uploads the tarball + `install.sh`).  
+Publish a release: push a tag `v0.0.2` (workflow builds, tests, uploads the tarball + `install.sh`).  
 GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
 
 Install layout:
@@ -125,13 +125,16 @@ Mulation report
   mutants:   N
   killed:    K
   survived:  S
+  timeout:   T   (excluded from score)
   score:     K/(K+S) %
 ```
 
-- **killed** — test failed, crashed, or timed out under that mutant
+- **killed** — test failed or crashed under that mutant
 - **survived** — suite still green (or site never hit; uncovered counts as survived)
+- **timeout** — per-mutant deadline hit (often loop-index mutants); reported but **not** scored as killed, so hangs do not inflate the gate
 - **`--min-score N`** — exit non-zero if score is below N
 - **`--git-diff [BASE]`** — only mutants on lines changed vs BASE (default `HEAD`); fails closed on a bad revision
+- **`-j` / `--jobs N`** — parallel mutant workers
 
 The tool does not invent per-operator advice. Survived lines are locations for you to strengthen assertions if the mutant is meaningful.
 
@@ -150,7 +153,7 @@ Prefer `--git-diff` so the denser operator set stays cheap on PRs.
 ```yaml
 jobs:
   mulation:
-    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.1
+    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.2
     with:
       test-binary: ./build/my_tests   # already built with mulation c++
       min-score: "80"
@@ -175,7 +178,7 @@ See [docs/weak-to-strong.md](docs/weak-to-strong.md) for turning survivors into 
 
 `examples/gtest-ctest/` is a demo green suite with a weak boundary (surviving `>=` → `>`). It is not special-cased in the runner; any instrumented test binary works the same way.
 
-The same idea applies to **mulation-bot itself**: `make test` scores an instrumented runner-library binary (`build/mulation_self_tests`: catalog/diff/cli + matching unit tests). Report the score; do not invent stronger cases only to kill mutants. Process stays on the plain unit suite only (timeouts would explode self-campaign time).
+The same idea applies to **mulation-bot itself**: `make test` scores an instrumented runner-library binary (`build/mulation_self_tests`: catalog/diff + matching unit tests). Report the score; do not invent stronger cases only to kill mutants. Process and CLI stay uninstrumented in the self binary (loop-index mutants hang and flood timeouts into the score).
 
 ```bash
 make test

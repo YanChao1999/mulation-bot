@@ -265,7 +265,8 @@ int main(int argc, char **argv) {
 
     int timeout = opt.timeout_ms;
     if (timeout <= 0) {
-        timeout = std::max(2000, base.duration_ms * 5 + 1000);
+        // Keep hangs from dominating wall time; 3x baseline is enough for gtest suites.
+        timeout = std::max(1500, base.duration_ms * 3 + 500);
     }
 
     std::set<uint32_t> covered;
@@ -385,14 +386,17 @@ int main(int argc, char **argv) {
     }
 
     survived += static_cast<int>(uncovered.size());
-    const int denom = killed + survived;
-    const double score = denom == 0 ? 100.0 : (100.0 * killed / denom);
+    // Timeouts are reported but excluded from the score: hang-prone loop mutants
+    // otherwise inflate "killed" without proving an assertion caught the fault.
+    const int killed_scored = killed - timeout_n;
+    const int denom = killed_scored + survived;
+    const double score = denom == 0 ? 100.0 : (100.0 * killed_scored / denom);
 
     std::cout << "\nMulation report\n";
     std::cout << "  mutants:   " << mutants.size() << "\n";
-    std::cout << "  killed:    " << killed << "\n";
+    std::cout << "  killed:    " << killed_scored << "\n";
     std::cout << "  survived:  " << survived << "\n";
-    std::cout << "  timeout:   " << timeout_n << " (counted as killed)\n";
+    std::cout << "  timeout:   " << timeout_n << " (excluded from score)\n";
     if (!uncovered.empty()) {
         std::cout << "  uncovered: " << uncovered.size() << " (counted as survived)\n";
     }
@@ -418,7 +422,7 @@ int main(int argc, char **argv) {
 
     if (!opt.json_out.empty()) {
         std::ofstream js(opt.json_out);
-        js << "{\"killed\":" << killed << ",\"survived\":" << survived
+        js << "{\"killed\":" << killed_scored << ",\"survived\":" << survived
            << ",\"timeout\":" << timeout_n << ",\"score\":" << score << ",\"survivors\":[";
         bool first = true;
         auto emit = [&](const Mutant &m) {

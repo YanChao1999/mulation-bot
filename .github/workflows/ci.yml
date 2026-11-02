@@ -58,7 +58,7 @@ jobs:
       - name: Build and package
         run: |
           chmod +x scripts/package-release.sh scripts/install.sh
-          VERSION=0.0.1-ci sh scripts/package-release.sh
+          VERSION=0.0.2-ci sh scripts/package-release.sh
         env:
           CXX: clang++-18
           CC: clang-18
@@ -66,11 +66,48 @@ jobs:
       - name: Verify install layout from tarball
         run: |
           set -eu
-          pkg=$(ls dist/mulation-bot-0.0.1-ci-linux-x86_64.tar.gz)
+          pkg=$(ls dist/mulation-bot-0.0.2-ci-linux-x86_64.tar.gz)
           work=$(mktemp -d)
           tar -C "$work" -xf "$pkg"
-          stage="$work/mulation-bot-0.0.1-ci-linux-x86_64"
+          stage="$work/mulation-bot-0.0.2-ci-linux-x86_64"
           test -x "$stage/bin/mulation"
           test -f "$stage/lib/libmulation_plugin.so"
           test -f "$stage/include/mulation/mulation.h"
           test -f scripts/install.sh
+
+  # Dogfood: install published v0.0.2 runner, instrument example with local plugin,
+  # run the same gate consumers get from the reusable workflow.
+  dogfood-release:
+    name: dogfood release install + example gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang 18
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 llvm-18 llvm-18-dev
+      - name: Install mulation from GitHub Release v0.0.2
+        env:
+          MULATION_VERSION: v0.0.2
+          PREFIX: ${{ runner.temp }}/mulation-prefix
+        run: |
+          set -eu
+          curl -fsSL \
+            "https://github.com/YanChao1999/mulation-bot/releases/download/${MULATION_VERSION}/install.sh" \
+            | sh
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+          "${PREFIX}/bin/mulation" --help >/dev/null
+      - name: Build instrumented example with repo plugin
+        run: make example
+        env:
+          CXX: clang++-18
+          CC: clang-18
+          LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+      - name: Mutation gate (git-diff + jobs)
+        run: |
+          set -eu
+          report="${{ runner.temp }}/mulation-report.json"
+          # min-score 0: example suite is intentionally weak; we only dogfood the path.
+          mulation --min-score 0 -j 4 --json-out "$report" ./build/compare_tests
+          test -f "$report"
+          grep -q '"survivors"' "$report"

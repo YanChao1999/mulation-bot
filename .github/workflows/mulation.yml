@@ -3,7 +3,7 @@
 # Consumer example:
 #   jobs:
 #     mulation:
-#       uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.1
+#       uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.2
 #       with:
 #         test-binary: ./build/my_tests
 #         min-score: "80"
@@ -47,10 +47,10 @@ on:
         required: false
         default: ""
       mulation-version:
-        description: Release tag to install (e.g. v0.0.1); empty = latest
+        description: Release tag to install (e.g. v0.0.2); empty = latest
         type: string
         required: false
-        default: "v0.0.1"
+        default: "v0.0.2"
       comment-survivors:
         description: Post PR review comments for survived mutants
         type: boolean

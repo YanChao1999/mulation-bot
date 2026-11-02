@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mulation-bot VERSION 0.0.1 LANGUAGES C CXX)
+project(mulation-bot VERSION 0.0.2 LANGUAGES C CXX)
 
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   message(WARNING "Build the pass plugin with Clang: cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang")
@@ -106,9 +106,8 @@ if(MULATION_BUILD_TESTS)
   set(_self_sut_src
     runner/catalog.cpp
     runner/diff.cpp
-    runner/cli.cpp
   )
-  # Dogfood: instrument catalog/diff/cli only; omit process (+ its tests) for speed.
+  # Dogfood: instrument catalog/diff only. CLI/process stay plain (loop mutants hang).
   add_library(mulation_self_sut OBJECT ${_self_sut_src})
   target_include_directories(mulation_self_sut PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
@@ -119,7 +118,7 @@ if(MULATION_BUILD_TESTS)
   if(TARGET mulation_plugin)
     add_dependencies(mulation_self_sut mulation_plugin)
   endif()
-  add_executable(mulation_self_tests ${_self_test_src} runner/process.cpp
+  add_executable(mulation_self_tests ${_self_test_src} runner/process.cpp runner/cli.cpp
                  $<TARGET_OBJECTS:mulation_self_sut>)
   target_include_directories(mulation_self_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
@@ -129,7 +128,8 @@ if(MULATION_BUILD_TESTS)
   target_include_directories(mulation_self_tests PRIVATE
     $<TARGET_PROPERTY:${MULATION_RUNTIME_TARGET},INTERFACE_INCLUDE_DIRECTORIES>)
   add_test(NAME mulation_self_check
-    COMMAND $<TARGET_FILE:mulation-run> --min-score 0 $<TARGET_FILE:mulation_self_tests>)
+    COMMAND $<TARGET_FILE:mulation-run> --min-score 0 -j 4 --timeout-ms 2000
+            $<TARGET_FILE:mulation_self_tests>)
   set_tests_properties(mulation_self_check PROPERTIES DEPENDS mulation_unit_tests)
 
   add_executable(runtime_test tests/runtime_test.c)

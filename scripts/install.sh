@@ -1,10 +1,10 @@
 #!/bin/sh
 # Install mulation-bot from a GitHub Release tarball into PREFIX (default: $HOME/.local).
 #
-#   curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.1/install.sh | sh
+#   curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.2/install.sh | sh
 #
 # Environment:
-#   MULATION_VERSION  Release tag (default: latest), e.g. v0.0.1
+#   MULATION_VERSION  Release tag (default: latest), e.g. v0.0.2
 #   PREFIX            Install root (default: $HOME/.local)
 #   MULATION_REPO     GitHub repo (default: YanChao1999/mulation-bot)
 set -eu
@@ -53,7 +53,7 @@ if [ -z "$VERSION" ]; then
             head -n 1
     )
     if [ -z "$VERSION" ]; then
-        fail "could not resolve latest release for ${REPO} (no release yet, or GitHub API blocked — set MULATION_VERSION=v0.0.1)"
+        fail "could not resolve latest release for ${REPO} (no release yet, or GitHub API blocked — set MULATION_VERSION=v0.0.2)"
     fi
 fi
 

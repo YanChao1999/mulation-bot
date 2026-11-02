@@ -18,15 +18,16 @@ LLVM_LIBDIR := $(shell $(LLVM_CONFIG) --libdir)
 
 PLUGIN_CXXFLAGS := $(shell $(LLVM_CONFIG) --cxxflags) -fPIC -fno-rtti
 RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.cpp runner/cli.cpp
-# Runner library under test. Process stays uninstrumented in SELF (timeouts make
-# campaigns too slow). Do not pad assertions to chase 100% — report the score.
+# Runner library under test. Process + CLI stay uninstrumented in SELF:
+# mutating loop indices in the parser hangs and floods timeouts into the score.
+# Do not pad assertions to chase 100% — report the score.
 UNIT_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
 	tests/process_test.cpp tests/cli_test.cpp tests/elf_catalog_test.cpp
 RUNNER_LIB_SRC := runner/catalog.cpp runner/diff.cpp runner/process.cpp runner/cli.cpp
 UNIT_SRC := $(UNIT_TEST_SRC) $(RUNNER_LIB_SRC)
-# Instrumented SUT for dogfood (exclude process.cpp — timeouts blow up campaigns).
-SELF_SUT_SRC := runner/catalog.cpp runner/diff.cpp runner/cli.cpp
-# Self-mutation suite: skip process (+ process_test) so each mutant stays cheap.
+# Instrumented SUT for dogfood: catalog + diff only.
+SELF_SUT_SRC := runner/catalog.cpp runner/diff.cpp
+# Self-mutation suite: skip process_test (timeouts) and instrumented cli.
 SELF_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
 	tests/cli_test.cpp tests/elf_catalog_test.cpp
 SELF_PLAIN_SRC := $(SELF_TEST_SRC)
@@ -65,9 +66,8 @@ $(BUILD)/self_catalog.o: runner/catalog.cpp $(PLUGIN) | $(BUILD)
 $(BUILD)/self_diff.o: runner/diff.cpp $(PLUGIN) | $(BUILD)
 	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
 		-fpass-plugin=$(abspath $(PLUGIN)) -Irunner -Iinclude $< -o $@
-$(BUILD)/self_cli.o: runner/cli.cpp $(PLUGIN) | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
-		-fpass-plugin=$(abspath $(PLUGIN)) -Irunner -Iinclude $< -o $@
+$(BUILD)/self_cli.o: runner/cli.cpp | $(BUILD)
+	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_process.o: runner/process.cpp | $(BUILD)
 	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_unit_main.o: tests/unit_main.cpp | $(BUILD)
@@ -123,7 +123,7 @@ test: $(UNIT) $(RUNTIME_TEST) example $(SELF)
 	@echo "== mulation (example) =="
 	$(RUNNER) --min-score 0 -j 2 $(EXAMPLE)
 	@echo "== mulation (self) =="
-	$(RUNNER) --min-score 0 -j 4 $(SELF)
+	$(RUNNER) --min-score 0 -j 4 --timeout-ms 2000 $(SELF)
 	@echo "== cli smoke =="
 	sh scripts/run-cli-tests.sh $(RUNNER) $(EXAMPLE)
 

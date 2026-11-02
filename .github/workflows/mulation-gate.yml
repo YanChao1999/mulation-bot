@@ -60,6 +60,12 @@ jobs:
           fi
           mulation --min-score "$MIN_SCORE" -j "$JOBS" --git-diff="$base" \
             --json-out "$report" "$TEST_BINARY"
+          # Older releases (v0.0.3) exit 0 on empty git-diff without writing JSON.
+          if [ ! -f "$report" ]; then
+            printf '%s\n' \
+              '{"killed":0,"survived":0,"timeout":0,"score":100,"survivors":[]}' \
+              > "$report"
+          fi
           test -f "$report"
           # Always exercise the comment script (dry-run on push; live on PR).
           if [ "${{ github.event_name }}" = "pull_request" ]; then

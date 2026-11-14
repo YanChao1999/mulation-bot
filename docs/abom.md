@@ -1,11 +1,12 @@
 # abom in this repo
 
-This repository dogfoods [abom](https://github.com/YanChao1999/abom) as an agent-material supply chain.
+This repository dogfoods [abom](https://github.com/YanChao1999/abom) as an agent-material supply chain, and also ships a first-party Cursor skill for mulation itself.
 
 | File | Role |
 |------|------|
 | `abom.lock.json` | Pins installed recipe commits + material digests |
 | `.abom/project.json` | Nearest-workspace wiring prefs (Cursor) |
+| `.cursor/skills/mulation/` · `skills/mulation/` | First-party skill: wire mutation gates, filters, discovery |
 
 ## Local
 
@@ -17,6 +18,10 @@ abom lock --check
 abom advisories
 abom report abom-skill
 ```
+
+For mulation workflows in Cursor, load the project skill
+[`.cursor/skills/mulation/SKILL.md`](../.cursor/skills/mulation/SKILL.md)
+(or the copy under `skills/mulation/`).
 
 ## CI
 

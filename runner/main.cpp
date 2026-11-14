@@ -1,7 +1,9 @@
 #include "catalog.hpp"
 #include "cli.hpp"
 #include "diff.hpp"
+#include "filter.hpp"
 #include "process.hpp"
+#include "test_filter.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -201,12 +203,22 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    {
+        std::string tf_err;
+        if (!apply_test_filter(opt, &tf_err)) {
+            std::cerr << "mulation: " << tf_err << "\n";
+            return 2;
+        }
+    }
+
     std::vector<std::string> elfs;
     std::vector<std::vector<Mutant>> groups;
+    std::set<std::string> seen_elf;
     auto add_elf = [&](const std::string &p) {
-        if (is_elf(p)) {
-            elfs.push_back(p);
+        if (!is_elf(p) || !seen_elf.insert(p).second) {
+            return;
         }
+        elfs.push_back(p);
     };
     add_elf(opt.cmd[0]);
     if (basename_of(opt.cmd[0]) == "ctest") {
@@ -216,6 +228,23 @@ int main(int argc, char **argv) {
     }
     for (const auto &b : opt.binaries) {
         add_elf(b);
+    }
+    if (!opt.discover_cmd.empty()) {
+        std::string out;
+        RunResult dr = run_command({"sh", "-c", opt.discover_cmd}, {}, 60000, &out);
+        if (dr.status != RunStatus::Pass) {
+            std::cerr << "mulation: --discover-cmd failed (exit " << dr.exit_code << ")\n";
+            return 2;
+        }
+        for (const auto &p : parse_discover_cmd_paths(out)) {
+            add_elf(p);
+        }
+    }
+    // Walk a snapshot: discovering linked libs may append more ELF paths.
+    for (std::size_t i = 0; i < elfs.size(); ++i) {
+        for (const auto &p : discover_linked_mutant_elfs(elfs[i])) {
+            add_elf(p);
+        }
     }
     for (const auto &p : elfs) {
         groups.push_back(read_elf_catalog(p));
@@ -234,7 +263,11 @@ int main(int argc, char **argv) {
         if (basename_of(opt.cmd[0]) == "ctest") {
             std::cerr
                 << "For `mulation -- ctest`, test binaries are discovered via "
-                   "`ctest --show-only=json-v1`; you can also pass --binary or --catalog-dir.\n";
+                   "`ctest --show-only=json-v1`; you can also pass --binary, --catalog-dir, or "
+                   "--discover-cmd.\n";
+        } else if (!is_elf(opt.cmd[0])) {
+            std::cerr << "Command is not an ELF; pass --binary / --catalog-dir / --discover-cmd "
+                         "so mutants can be found.\n";
         }
         return 2;
     }
@@ -259,9 +292,37 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (!opt.filter.empty() || !opt.exclude.empty() || !opt.kinds.empty() ||
+        !opt.mutant_ids.empty()) {
+        MutantFilter mf;
+        mf.filter = opt.filter;
+        mf.exclude = opt.exclude;
+        mf.kinds = opt.kinds;
+        mf.mutant_ids = opt.mutant_ids;
+        mutants = filter_mutants(mutants, mf);
+        if (mutants.empty()) {
+            std::cout << "mulation: no mutants left after --filter/--exclude/--kinds/--mutant-id; "
+                         "nothing to prove.\n";
+            if (!opt.json_out.empty()) {
+                std::ofstream js(opt.json_out);
+                js << "{\"killed\":0,\"survived\":0,\"timeout\":0,\"score\":100,\"survivors\":[]}"
+                      "\n";
+            }
+            return 0;
+        }
+    }
+
+    auto run_env = [&](const std::map<std::string, std::string> &base_env, int to_ms) {
+        std::map<std::string, std::string> env = base_env;
+        if (!opt.test_filter.empty() &&
+            (opt.resolved_framework == "custom" || opt.framework == "custom")) {
+            env["MULATION_TEST_FILTER"] = opt.test_filter;
+        }
+        return run_command(opt.cmd, env, to_ms);
+    };
+
     std::cout << "mulation: baseline (mutants off)...\n";
-    RunResult base = run_command(opt.cmd, {{"MULATION_MUTANT", ""}},
-                                 opt.timeout_ms > 0 ? opt.timeout_ms : 600000);
+    RunResult base = run_env({{"MULATION_MUTANT", ""}}, opt.timeout_ms > 0 ? opt.timeout_ms : 600000);
     if (base.status != RunStatus::Pass) {
         std::cerr << "mulation: original suite is not green (exit " << base.exit_code
                   << "). Mutation is meaningless until tests pass.\n";
@@ -281,7 +342,7 @@ int main(int argc, char **argv) {
         if (fd >= 0) {
             close(fd);
             RunResult cov =
-                run_command(opt.cmd, {{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
+                run_env({{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
             if (cov.status != RunStatus::Pass) {
                 std::cerr << "mulation: coverage baseline failed (exit " << cov.exit_code
                           << "); refusing a partial hit log.\n";
@@ -290,6 +351,18 @@ int main(int argc, char **argv) {
             }
             covered = load_hitlog(tmp);
             unlink(tmp);
+            if (covered.empty()) {
+                std::cerr
+                    << "mulation: coverage hitlog is empty after a green run.\n"
+                    << "  Likely the process skipped atexit (e.g. _exit / posix_exit) so "
+                       "MULATION_HITLOG never flushed.\n"
+                    << "  Fix the exit path, or pass --allow-empty-coverage to run every mutant, "
+                       "or --no-coverage.\n";
+                if (!opt.allow_empty_coverage) {
+                    return 2;
+                }
+                std::cerr << "mulation: continuing with all mutants (--allow-empty-coverage).\n";
+            }
         }
     }
 
@@ -336,8 +409,7 @@ int main(int argc, char **argv) {
                 break;
             }
             const Mutant *m = todo[i];
-            std::map<std::string, std::string> env{{"MULATION_MUTANT", std::to_string(m->id)}};
-            RunResult rr = run_command(opt.cmd, env, timeout);
+            RunResult rr = run_env({{"MULATION_MUTANT", std::to_string(m->id)}}, timeout);
             Outcome o;
             o.order = i;
             o.m = m;

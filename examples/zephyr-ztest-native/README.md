@@ -6,8 +6,8 @@ Small advantage over gtest-only mutation tools: the same Valgrind-style gate wor
 mulation does not replace ZTEST or Twister. It wraps the host ELF Twister/`west` already produces.
 
 ```text
-west build -b native_sim
-./build/zephyr/zephyr.exe          # ZTEST must exit 0
+west build -b native_sim/native/64   # prefer 64-bit when available
+./build/zephyr/zephyr.exe            # ZTEST must exit 0
 mulation --git-diff -j 4 -- ./build/zephyr/zephyr.exe
 ```
 
@@ -36,9 +36,11 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Build & gate
 
+Prefer the 64-bit host board when your Zephyr tree provides it:
+
 ```bash
 export ZEPHYR_TOOLCHAIN_VARIANT=llvm   # must be Clang for -fpass-plugin
-west build -p always -b native_sim \
+west build -p always -b native_sim/native/64 \
   -d build-native \
   examples/zephyr-ztest-native
 
@@ -50,8 +52,17 @@ mulation --git-diff --min-score 80 -j 4 -- \
   ./build-native/zephyr/zephyr.exe
 ```
 
+If you only have classic `-b native_sim` (often **32-bit**), that still works: the runner
+reads both ELFCLASS64 and ELFCLASS32 `mulation_mutants` sections.
+
 Adjust `-d` / paths to match your west workspace. Some trees name the binary
 `zephyr.elf` instead of `zephyr.exe` — point `mulation` at whichever host ELF you get.
+
+Pass ZTEST selection through as trailing args when useful:
+
+```bash
+mulation -- ./build-native/zephyr/zephyr.exe -test=compare::adult_boundary
+```
 
 ## Intentionally weak ZTEST
 
@@ -79,6 +90,7 @@ Do **not** point mulation at a QEMU-wrapped Twister invocation unless every muta
 ## Pitfalls
 
 1. **GCC Zephyr toolchain** — no Clang pass; switch to LLVM.
-2. **Instrumenting all of Zephyr** — too slow / noisy; only SUT `.c` via `set_source_files_properties` (see CMakeLists).
+2. **Instrumenting all of Zephyr** — too slow / noisy; only SUT `.c` via `set_source_files_properties` (see CMakeLists), or `mulation_instrument_sources(app SOURCES ...)` when using installed `Mulation.cmake`. Paths under `/zephyr/` and `/ztest/` are also skipped by the pass when using `CXX="mulation c++"`.
 3. **Always-zero exit** — if the runner swallows ZTEST failures, fix that before mutation.
 4. **C++ apps** — same pattern; use `mulation c++` / `.cpp` sources with the pass plugin.
+5. **Coverage / `atexit`** — if the host binary exits via `_exit` without flushing `MULATION_HITLOG`, coverage filtering falls back to all mutants; prefer a normal `exit` path.

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>mulation — mutation layer for Google Test &amp; CTest</title>
+    <title>mulation — mutation layer for gtest / CTest / doctest / ZTEST</title>
     <meta
       name="description"
       content="Green unit tests and high coverage can still miss bugs. mulation injects faults to prove your assertions would catch them."
@@ -20,7 +20,9 @@
     <header class="top">
       <a class="brand" href="./">mulation</a>
       <nav>
-        <a href="#why">Why it matters</a>
+        <a href="#why">Why</a>
+        <a href="#gate">Gate</a>
+        <a href="#frameworks">Frameworks</a>
         <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
         <a href="https://github.com/YanChao1999/mulation-bot">GitHub</a>
       </nav>
@@ -96,14 +98,33 @@ TEST(Adult, TwentyIsAdult)   still PASS
 score: ~62%  ← denser operators; boundary still open; coverage still lied</code></pre>
       </section>
 
-      <section class="band" id="get-started">
+      <section class="band" id="gate">
         <h2>Same habit as Valgrind</h2>
         <p class="support">
-          Keep writing Google Test. Keep running CTest. Add mulation as the gate that
-          asks: if this operator were wrong, would a test fail?
+          Keep writing gtest, doctest, or ZTEST. Keep running CTest. Add mulation as the
+          gate that asks: if this operator were wrong, would a test fail?
         </p>
-        <pre class="cmd"><code>mulation --git-diff --min-score 80 -- ./build/my_tests
+        <pre class="cmd"><code>mulation --git-diff --min-score 80 -j 4 -- ./build/my_tests
+mulation --git-diff --filter src/ --kinds ROR,AOR -- ./build/my_tests
+mulation --test-filter Adult.* -- ./build/my_tests
 mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
+      </section>
+
+      <section class="band" id="frameworks">
+        <h2>Frameworks &amp; discovery</h2>
+        <p class="support">
+          Any host ELF that exits non-zero on failure works. Shared libraries with a
+          <code>mulation_mutants</code> section are found via <code>DT_NEEDED</code>;
+          custom orchestrators can print ELF paths with <code>--discover-cmd</code>.
+        </p>
+        <pre class="cmd"><code># doctest / ZTEST / custom harness
+mulation --framework=doctest --test-filter '*Adult*' -- ./build/my_doctest
+mulation --test-filter compare::adult_boundary -- ./build/zephyr/zephyr.exe
+mulation --framework=custom --test-filter only_me -- ./my_harness
+mulation --discover-cmd 'find build -name libfoo.so' -- ./build/tests
+
+# empty hitlog (e.g. _exit skipping atexit) fails closed unless:
+mulation --allow-empty-coverage -- ./build/my_tests</code></pre>
       </section>
 
       <section class="band">
@@ -115,9 +136,16 @@ mulation --git-diff --min-score 80 -- ctest --test-dir build</code></pre>
         <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
+export MULATION_SKIP_PATHS=third_party/my_ut.h   # optional: custom UT headers
 CXX="mulation c++" CC="mulation cc" cmake -B build &amp;&amp; cmake --build build
 ctest --test-dir build          # must stay green
 mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
+        <pre class="cmd"><code># CMake helpers (after install)
+include(Mulation)
+mulation_instrument(my_lib)
+mulation_instrument_sources(app SOURCES src/foo.c)   # Zephyr-style
+mulation_add_check(my_tests TEST_FILTER Adult.* JOBS 4)
+# → mulation-check-my_tests + umbrella mulation-check</code></pre>
         <p class="support">
           Prefer a tarball? Grab
           <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
@@ -126,27 +154,25 @@ mulation --git-diff --min-score 80 -- ./build/my_tests</code></pre>
           <a href="https://github.com/YanChao1999/mulation-bot/blob/main/docs/weak-to-strong.md"
             >Weak → strong guide</a
           >.
-          Wire CI in five minutes with the
+          Wire CI with the
           <a
             href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/consumer-template"
             >consumer template</a
           >.
-          On Zephyr, gate
-          <a
-            href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/zephyr-ztest-native"
-            >ZTEST on <code>native_sim</code></a
-          >
-          the same Valgrind-style way.
+          Examples:
+          <a href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/gtest-ctest">gtest</a>,
+          <a href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/doctest">doctest</a>,
+          <a href="https://github.com/YanChao1999/mulation-bot/tree/main/examples/zephyr-ztest-native">Zephyr ZTEST</a>.
         </p>
       </section>
 
       <section class="band" id="zephyr">
         <h2>Zephyr + ZTEST</h2>
         <p class="support">
-          Same gate, different framework: build with Clang on <code>native_sim</code>,
-          keep ZTEST green, wrap the host ELF.
+          Same gate on a host board: prefer <code>native_sim/native/64</code>; 32-bit
+          ELFs are readable too. Instrument SUT sources only.
         </p>
-        <pre class="cmd"><code>west build -b native_sim -d build-native path/to/examples/zephyr-ztest-native
+        <pre class="cmd"><code>west build -b native_sim/native/64 -d build-native path/to/examples/zephyr-ztest-native
 ./build-native/zephyr/zephyr.exe
 mulation --git-diff --min-score 80 -j 4 -- ./build-native/zephyr/zephyr.exe</code></pre>
       </section>
@@ -156,20 +182,25 @@ mulation --git-diff --min-score 80 -j 4 -- ./build-native/zephyr/zephyr.exe</cod
         <dl>
           <div>
             <dt>killed</dt>
-            <dd>A test failed or timed out — the suite noticed the injected bug.</dd>
+            <dd>A test failed or crashed — the suite noticed the injected bug.</dd>
           </div>
           <div>
             <dt>survived</dt>
             <dd>
               Suite still green after the fault — coverage may have hit the line, but no
-              assertion depended on the correct operator.
+              assertion depended on the correct operator. Uncovered sites count as survived.
             </dd>
+          </div>
+          <div>
+            <dt>timeout</dt>
+            <dd>Per-mutant deadline; reported but excluded from the score.</dd>
           </div>
           <div>
             <dt>score</dt>
             <dd>
-              killed / (killed + survived). Use <code>--git-diff</code> so PR campaigns
-              stay cheap.
+              killed / (killed + survived). Use <code>--git-diff</code>,
+              <code>--filter</code> / <code>--kinds</code>, and <code>--test-filter</code>
+              so PR campaigns stay cheap.
             </dd>
           </div>
         </dl>
@@ -179,8 +210,10 @@ mulation --git-diff --min-score 80 -j 4 -- ./build-native/zephyr/zephyr.exe</cod
         <h2>Honest limits</h2>
         <p class="support">
           Clang/LLVM 18 on Linux today. Needs a rebuild with the pass plugin — not pure
-          DBI. Equivalent mutants can inflate “survived.” Young tool; niche is a thin
-          gtest/CTest gate that proves weak tests before production.
+          DBI. Equivalent mutants can inflate “survived.” Empty coverage hitlogs fail
+          closed (fix <code>atexit</code> / avoid bare <code>_exit</code>, or pass
+          <code>--allow-empty-coverage</code>). Young tool; niche is a thin host-ELF
+          mutation gate before production.
         </p>
       </section>
     </main>

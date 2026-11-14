@@ -10,26 +10,32 @@ RUNTIME := $(BUILD)/libmulation_runtime.a
 RUNNER := $(BUILD)/mulation-run
 MULATION := $(BUILD)/mulation
 EXAMPLE := $(BUILD)/compare_tests
+DOCTEST_EXAMPLE := $(BUILD)/doctest_compare_tests
 UNIT := $(BUILD)/mulation_unit_tests
 SELF := $(BUILD)/mulation_self_tests
 RUNTIME_TEST := $(BUILD)/runtime_test
-PLUGIN_CXX := clang++
+PLUGIN_CXX ?= clang++
 LLVM_LIBDIR := $(shell $(LLVM_CONFIG) --libdir)
+LLVM_LIBS := $(shell $(LLVM_CONFIG) --libs)
 
 PLUGIN_CXXFLAGS := $(shell $(LLVM_CONFIG) --cxxflags) -fPIC -fno-rtti
-RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.cpp runner/cli.cpp
+RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.cpp \
+	runner/cli.cpp runner/filter.cpp runner/test_filter.cpp
 # Runner library under test. Process + CLI stay uninstrumented in SELF:
 # mutating loop indices in the parser hangs and floods timeouts into the score.
 # Do not pad assertions to chase 100% — report the score.
 UNIT_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
-	tests/process_test.cpp tests/cli_test.cpp tests/elf_catalog_test.cpp
-RUNNER_LIB_SRC := runner/catalog.cpp runner/diff.cpp runner/process.cpp runner/cli.cpp
+	tests/process_test.cpp tests/cli_test.cpp tests/elf_catalog_test.cpp \
+	tests/filter_test.cpp tests/test_filter_test.cpp
+RUNNER_LIB_SRC := runner/catalog.cpp runner/diff.cpp runner/process.cpp runner/cli.cpp \
+	runner/filter.cpp runner/test_filter.cpp
 UNIT_SRC := $(UNIT_TEST_SRC) $(RUNNER_LIB_SRC)
 # Instrumented SUT for dogfood: catalog + diff only.
 SELF_SUT_SRC := runner/catalog.cpp runner/diff.cpp
 # Self-mutation suite: skip process_test (timeouts) and instrumented cli.
 SELF_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
-	tests/cli_test.cpp tests/elf_catalog_test.cpp
+	tests/cli_test.cpp tests/elf_catalog_test.cpp tests/filter_test.cpp \
+	tests/test_filter_test.cpp
 SELF_PLAIN_SRC := $(SELF_TEST_SRC)
 
 .PHONY: all example test lint tidy format format-check check clean install install-smoke package
@@ -41,7 +47,7 @@ $(BUILD):
 
 $(PLUGIN): plugin/MulationPass.cpp | $(BUILD)
 	$(PLUGIN_CXX) -shared -fPIC $(PLUGIN_CXXFLAGS) $< -o $@ \
-		-L$(LLVM_LIBDIR) -lLLVM \
+		-L$(LLVM_LIBDIR) $(LLVM_LIBS) \
 		-Wl,-rpath,$(LLVM_LIBDIR)
 
 $(BUILD)/mulation_runtime.o: runtime/mulation_runtime.c include/mulation/mulation.h | $(BUILD)
@@ -50,62 +56,89 @@ $(BUILD)/mulation_runtime.o: runtime/mulation_runtime.c include/mulation/mulatio
 $(RUNTIME): $(BUILD)/mulation_runtime.o
 	ar rcs $@ $<
 
-$(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp | $(BUILD)
+$(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp \
+		runner/filter.hpp runner/test_filter.hpp | $(BUILD)
 	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner $(RUNNER_SRC) -o $@
 
 $(MULATION): $(RUNNER)
 	ln -sfn mulation-run $@
 
-$(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp runner/cli.hpp | $(BUILD)
+$(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp \
+		runner/cli.hpp runner/filter.hpp runner/test_filter.hpp | $(BUILD)
 	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner -Itests $(UNIT_SRC) -o $@
 
 # Same suite as UNIT; catalog/diff/cli compiled with the pass + runtime (dogfood).
 $(BUILD)/self_catalog.o: runner/catalog.cpp $(PLUGIN) | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
 		-fpass-plugin=$(abspath $(PLUGIN)) -Irunner -Iinclude $< -o $@
 $(BUILD)/self_diff.o: runner/diff.cpp $(PLUGIN) | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
 		-fpass-plugin=$(abspath $(PLUGIN)) -Irunner -Iinclude $< -o $@
 $(BUILD)/self_cli.o: runner/cli.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_process.o: runner/process.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_unit_main.o: tests/unit_main.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
 $(BUILD)/self_catalog_test.o: tests/catalog_test.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
 $(BUILD)/self_diff_test.o: tests/diff_test.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
 $(BUILD)/self_cli_test.o: tests/cli_test.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
 $(BUILD)/self_elf_catalog_test.o: tests/elf_catalog_test.cpp | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+$(BUILD)/self_filter.o: runner/filter.cpp | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
+$(BUILD)/self_filter_test.o: tests/filter_test.cpp | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+$(BUILD)/self_test_filter.o: runner/test_filter.cpp | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
+$(BUILD)/self_test_filter_test.o: tests/test_filter_test.cpp | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
 
 # process.o linked for git_diff_ranges; process_test omitted (timeouts).
 $(SELF): $(BUILD)/self_catalog.o $(BUILD)/self_diff.o $(BUILD)/self_cli.o $(BUILD)/self_process.o \
+		$(BUILD)/self_filter.o $(BUILD)/self_test_filter.o \
 		$(BUILD)/self_unit_main.o $(BUILD)/self_catalog_test.o $(BUILD)/self_diff_test.o \
-		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o \
+		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o $(BUILD)/self_filter_test.o \
+		$(BUILD)/self_test_filter_test.o \
 		$(RUNTIME)
-	clang++ $(BUILD)/self_catalog.o $(BUILD)/self_diff.o $(BUILD)/self_cli.o $(BUILD)/self_process.o \
+	$(CXX) $(BUILD)/self_catalog.o $(BUILD)/self_diff.o $(BUILD)/self_cli.o $(BUILD)/self_process.o \
+		$(BUILD)/self_filter.o $(BUILD)/self_test_filter.o \
 		$(BUILD)/self_unit_main.o $(BUILD)/self_catalog_test.o $(BUILD)/self_diff_test.o \
-		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o \
+		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o $(BUILD)/self_filter_test.o \
+		$(BUILD)/self_test_filter_test.o \
 		$(RUNTIME) -o $@
 
 $(RUNTIME_TEST): tests/runtime_test.c $(RUNTIME) include/mulation/mulation.h | $(BUILD)
 	$(CC) -std=c11 -O2 $(WARNFLAGS) -Werror -Iinclude tests/runtime_test.c $(RUNTIME) -o $@
 
 $(BUILD)/compare.o: examples/gtest-ctest/src/compare.cpp examples/gtest-ctest/src/compare.h $(PLUGIN) | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -fpass-plugin=$(abspath $(PLUGIN)) \
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -fpass-plugin=$(abspath $(PLUGIN)) \
 		-Iexamples/gtest-ctest/src -c $< -o $@
 
 $(BUILD)/compare_test.o: examples/gtest-ctest/tests/compare_test.cpp \
 		examples/gtest-ctest/mini_gtest.h examples/gtest-ctest/src/compare.h | $(BUILD)
-	clang++ -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -Iexamples/gtest-ctest -Iexamples/gtest-ctest/src -c $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -Iexamples/gtest-ctest -Iexamples/gtest-ctest/src -c $< -o $@
 
 $(EXAMPLE): $(BUILD)/compare.o $(BUILD)/compare_test.o $(RUNTIME)
-	clang++ $^ -o $@
+	$(CXX) $^ -o $@
 
-example: $(EXAMPLE) $(RUNNER)
+$(BUILD)/doctest_compare.o: examples/doctest/src/compare.cpp examples/doctest/src/compare.h \
+		$(PLUGIN) | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -fpass-plugin=$(abspath $(PLUGIN)) \
+		-Iexamples/doctest/src -c $< -o $@
+
+$(BUILD)/doctest_compare_test.o: examples/doctest/tests/compare_test.cpp \
+		examples/doctest/doctest.h examples/doctest/src/compare.h | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -Iexamples/doctest \
+		-Iexamples/doctest/src -c $< -o $@
+
+$(DOCTEST_EXAMPLE): $(BUILD)/doctest_compare.o $(BUILD)/doctest_compare_test.o $(RUNTIME)
+	$(CXX) $^ -o $@
+
+example: $(EXAMPLE) $(DOCTEST_EXAMPLE) $(RUNNER)
 
 test: $(UNIT) $(RUNTIME_TEST) example $(SELF)
 	@echo "== runner =="
@@ -122,6 +155,8 @@ test: $(UNIT) $(RUNTIME_TEST) example $(SELF)
 	@MULATION_TEST_ELF=$(EXAMPLE) $(UNIT)
 	@echo "== mulation (example) =="
 	$(RUNNER) --min-score 0 -j 2 $(EXAMPLE)
+	@echo "== mulation (doctest example) =="
+	$(RUNNER) --min-score 0 -j 2 $(DOCTEST_EXAMPLE)
 	@echo "== mulation (self) =="
 	$(RUNNER) --min-score 0 -j 4 --timeout-ms 2000 $(SELF)
 	@echo "== cli smoke =="

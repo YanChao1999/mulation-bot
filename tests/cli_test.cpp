@@ -85,3 +85,35 @@ TEST(Cli, JobsFlag) {
     ParseResult c = parse({"--jobs", "0", "./t"});
     CHECK_EQ(static_cast<int>(c.kind), static_cast<int>(ParseKind::Error));
 }
+
+TEST(Cli, MutantFilters) {
+    ParseResult r = parse({"--filter", "src/", "--filter=lib/", "--exclude", "third_party",
+                           "--kinds", "ROR,AOR", "--mutant-id", "7", "--mutant-id=9", "./t"});
+    CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Ok));
+    CHECK_EQ(r.options.filter.size(), 2u);
+    CHECK_EQ(r.options.filter[0], std::string("src/"));
+    CHECK_EQ(r.options.filter[1], std::string("lib/"));
+    CHECK_EQ(r.options.exclude.size(), 1u);
+    CHECK_EQ(r.options.exclude[0], std::string("third_party"));
+    CHECK_EQ(r.options.kinds.size(), 2u);
+    CHECK_EQ(r.options.kinds[0], std::string("ROR"));
+    CHECK_EQ(r.options.kinds[1], std::string("AOR"));
+    CHECK_EQ(r.options.mutant_ids.size(), 2u);
+    CHECK_EQ(r.options.mutant_ids[0], 7u);
+    CHECK_EQ(r.options.mutant_ids[1], 9u);
+}
+
+TEST(Cli, FilterRequiresValue) {
+    ParseResult r = parse({"--filter"});
+    CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Error));
+}
+
+TEST(Cli, TestFilterFrameworkDiscoverCoverage) {
+    ParseResult r = parse({"--test-filter", "Adult.*", "--framework=doctest",
+                           "--discover-cmd", "echo /tmp/a", "--allow-empty-coverage", "./t"});
+    CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Ok));
+    CHECK_EQ(r.options.test_filter, std::string("Adult.*"));
+    CHECK_EQ(r.options.framework, std::string("doctest"));
+    CHECK_EQ(r.options.discover_cmd, std::string("echo /tmp/a"));
+    CHECK(r.options.allow_empty_coverage);
+}

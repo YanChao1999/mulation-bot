@@ -53,4 +53,26 @@ set -e
 [ "$code" -eq 2 ] || fail "bad git-diff should fail closed exit=$code"
 ok Cli.GitDiffFailClosed
 
+set +e
+out=$("$runner" --min-score 0 --filter this-path-does-not-match-any-mutant "$binary" 2>&1)
+code=$?
+set -e
+[ "$code" -eq 0 ] || fail "empty --filter should exit 0 exit=$code"
+echo "$out" | grep -q 'nothing to prove' || fail "empty --filter should say nothing to prove"
+ok Cli.FilterEmpty
+
+"$runner" --min-score 0 --kinds ROR -j 2 "$binary" >/dev/null || fail "--kinds ROR campaign"
+ok Cli.KindsRor
+
+id=$("$runner" --min-score 0 --json-out "$json" --kinds ROR "$binary" >/dev/null && \
+  sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p' "$json" | head -n1)
+[ -n "$id" ] || fail "could not extract mutant id from json"
+"$runner" --min-score 0 --mutant-id "$id" "$binary" >/dev/null || fail "--mutant-id campaign"
+ok Cli.MutantId
+
+"$runner" --help 2>&1 | grep -q -- '--test-filter' || fail "help missing --test-filter"
+"$runner" --help 2>&1 | grep -q -- '--discover-cmd' || fail "help missing --discover-cmd"
+"$runner" --help 2>&1 | grep -q -- '--allow-empty-coverage' || fail "help missing --allow-empty-coverage"
+ok Cli.NewFlagsInHelp
+
 echo "[  PASSED  ] cli smoke"

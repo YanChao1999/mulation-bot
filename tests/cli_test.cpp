@@ -109,8 +109,8 @@ TEST(Cli, FilterRequiresValue) {
 }
 
 TEST(Cli, TestFilterFrameworkDiscoverCoverage) {
-    ParseResult r = parse({"--test-filter", "Adult.*", "--framework=doctest",
-                           "--discover-cmd", "echo /tmp/a", "--allow-empty-coverage", "./t"});
+    ParseResult r = parse({"--test-filter", "Adult.*", "--framework=doctest", "--discover-cmd",
+                           "echo /tmp/a", "--allow-empty-coverage", "./t"});
     CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Ok));
     CHECK_EQ(r.options.test_filter, std::string("Adult.*"));
     CHECK_EQ(r.options.framework, std::string("doctest"));

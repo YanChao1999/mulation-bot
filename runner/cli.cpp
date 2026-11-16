@@ -175,7 +175,8 @@ ParseResult parse_args(int argc, char **argv) {
             continue;
         }
         if (a.rfind("--mutant-id=", 0) == 0) {
-            o.mutant_ids.push_back(static_cast<uint32_t>(std::strtoul(a.c_str() + 12, nullptr, 10)));
+            o.mutant_ids.push_back(
+                static_cast<uint32_t>(std::strtoul(a.c_str() + 12, nullptr, 10)));
             ++i;
             continue;
         }

@@ -336,8 +336,7 @@ static bool read_dynamic_needed(std::ifstream &in, const Ehdr &eh, std::vector<s
     const std::size_t ndyn = static_cast<std::size_t>(dynph->p_filesz / sizeof(Dyn));
     std::vector<Dyn> dyn(ndyn);
     in.seekg(static_cast<std::streamoff>(dynph->p_offset));
-    in.read(reinterpret_cast<char *>(dyn.data()),
-            static_cast<std::streamsize>(dynph->p_filesz));
+    in.read(reinterpret_cast<char *>(dyn.data()), static_cast<std::streamsize>(dynph->p_filesz));
     if (!in) {
         return false;
     }
@@ -460,14 +459,14 @@ std::vector<std::string> discover_linked_mutant_elfs(const std::string &binary) 
         Elf64_Ehdr eh{};
         in.read(reinterpret_cast<char *>(&eh), sizeof(eh));
         if (!in || !read_dynamic_needed<Elf64_Ehdr, Elf64_Phdr, Elf64_Dyn>(in, eh, needed, runpath,
-                                                                            rpath)) {
+                                                                           rpath)) {
             return out;
         }
     } else if (ident[EI_CLASS] == ELFCLASS32) {
         Elf32_Ehdr eh{};
         in.read(reinterpret_cast<char *>(&eh), sizeof(eh));
         if (!in || !read_dynamic_needed<Elf32_Ehdr, Elf32_Phdr, Elf32_Dyn>(in, eh, needed, runpath,
-                                                                            rpath)) {
+                                                                           rpath)) {
             return out;
         }
     } else {
@@ -493,7 +492,8 @@ std::vector<std::string> parse_discover_cmd_paths(const std::string &stdout_text
     std::istringstream in(stdout_text);
     std::string line;
     while (std::getline(in, line)) {
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
+        while (!line.empty() &&
+               (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
             line.pop_back();
         }
         std::size_t start = 0;

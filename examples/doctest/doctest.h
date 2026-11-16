@@ -33,9 +33,9 @@ struct DoctestAdd {
 #define DOCTEST_CAT(a, b) DOCTEST_CAT_IMPL(a, b)
 
 #define TEST_CASE(name)                                                                            \
-    static void DOCTEST_CAT(DOCTEST_ANON_FUNC_, __LINE__)();                                        \
-    static DoctestAdd DOCTEST_CAT(_doctest_add_, __LINE__)(                                         \
-        name, DOCTEST_CAT(DOCTEST_ANON_FUNC_, __LINE__));                                           \
+    static void DOCTEST_CAT(DOCTEST_ANON_FUNC_, __LINE__)();                                       \
+    static DoctestAdd DOCTEST_CAT(_doctest_add_,                                                   \
+                                  __LINE__)(name, DOCTEST_CAT(DOCTEST_ANON_FUNC_, __LINE__));      \
     static void DOCTEST_CAT(DOCTEST_ANON_FUNC_, __LINE__)()
 
 #define CHECK(x)                                                                                   \

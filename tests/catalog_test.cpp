@@ -141,9 +141,8 @@ TEST(Catalog, DiscoverLinkedOnNonElfIsEmpty) {
 
 TEST(Catalog, ReadElf32CatalogSection) {
     // Minimal little-endian ELF32 with .shstrtab + mulation_mutants PROGBITS.
-    const char payload[] =
-        "{\"id\":99,\"file\":\"sut.c\",\"line\":4,\"col\":1,\"kind\":\"ROR\","
-        "\"op\":\">=\",\"mut\":\">\"}\n";
+    const char payload[] = "{\"id\":99,\"file\":\"sut.c\",\"line\":4,\"col\":1,\"kind\":\"ROR\","
+                           "\"op\":\">=\",\"mut\":\">\"}\n";
     const char shstr[] = "\0.shstrtab\0mulation_mutants";
     const uint32_t payload_size = static_cast<uint32_t>(sizeof(payload) - 1);
     const uint32_t shstr_off = sizeof(Elf32_Ehdr);

@@ -322,7 +322,8 @@ int main(int argc, char **argv) {
     };
 
     std::cout << "mulation: baseline (mutants off)...\n";
-    RunResult base = run_env({{"MULATION_MUTANT", ""}}, opt.timeout_ms > 0 ? opt.timeout_ms : 600000);
+    RunResult base =
+        run_env({{"MULATION_MUTANT", ""}}, opt.timeout_ms > 0 ? opt.timeout_ms : 600000);
     if (base.status != RunStatus::Pass) {
         std::cerr << "mulation: original suite is not green (exit " << base.exit_code
                   << "). Mutation is meaningless until tests pass.\n";
@@ -341,8 +342,7 @@ int main(int argc, char **argv) {
         int fd = mkstemp(tmp);
         if (fd >= 0) {
             close(fd);
-            RunResult cov =
-                run_env({{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
+            RunResult cov = run_env({{"MULATION_MUTANT", ""}, {"MULATION_HITLOG", tmp}}, timeout);
             if (cov.status != RunStatus::Pass) {
                 std::cerr << "mulation: coverage baseline failed (exit " << cov.exit_code
                           << "); refusing a partial hit log.\n";

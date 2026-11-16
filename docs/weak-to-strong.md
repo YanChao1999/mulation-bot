@@ -36,11 +36,21 @@ That pair kills the ROR boundary mutants. Prefer **on/off pairs** at the contrac
 
 ## Workflow
 
-1. Keep unit tests green (`ctest` / gtest / Zephyr ZTEST on `native_sim`).
-2. `mulation --git-diff --min-score 80 -- ./build/my_tests`
-   (or `./build/zephyr/zephyr.exe` for Zephyr host tests)
+1. Keep unit tests green (`ctest` / gtest / doctest / Zephyr ZTEST on `native_sim`).
+2. Run a cheap campaign on the PR diff (optionally slim further):
+
+   ```bash
+   mulation --git-diff --min-score 80 --filter src/ --kinds ROR,AOR \
+     --test-filter Adult.* -- ./build/my_tests
+   ```
+
+   Or `./build/doctest_compare_tests` / `./build/zephyr/zephyr.exe`.
 3. For each survivor on the PR diff: add the smallest assertion that would fail under that operator.
 4. Re-run. Do **not** pad tests only to chase 100% — kill meaningful faults; leave equivalents alone.
+
+## Coverage hitlog empty?
+
+If mulation exits with “coverage hitlog is empty”, the process likely skipped `atexit` (e.g. `_exit` / some `native_sim` paths), so `MULATION_HITLOG` never flushed. Prefer a normal `exit`, or temporarily use `--allow-empty-coverage` / `--no-coverage` while you fix the exit path.
 
 ## PR comments
 

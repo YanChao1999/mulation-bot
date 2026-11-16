@@ -1,10 +1,12 @@
-# Mulation CMake helpers (compat layer — does not replace Google Test or CTest)
+# Mulation CMake helpers (compat layer — does not replace gtest/doctest/ZTEST/CTest)
 #
 #   include(Mulation)   # or list(APPEND CMAKE_MODULE_PATH ...)
-#   mulation_instrument(my_lib)           # SUT only, never test sources
-#   mulation_add_check(my_tests)          # custom target mulation-check
+#   mulation_instrument(my_lib)                    # SUT only, never test sources
+#   mulation_instrument_sources(app SOURCES a.c)   # per-source (Zephyr-style app targets)
+#   mulation_add_check(my_tests [ARGS ...] ...)    # mulation-check-<target> + umbrella mulation-check
 #
-# ctest stays the unit-test runner. mulation-check is the pre-production gate.
+# Your unit runner stays the unit-test runner. mulation-check is the pre-production gate.
+# Optional at compile time: MULATION_SKIP_PATHS=colon:separated:substrings
 
 if(NOT DEFINED MULATION_PLUGIN_PATH)
   if(TARGET mulation_plugin)
@@ -75,8 +77,41 @@ function(mulation_instrument target)
   endif()
 endfunction()
 
+# Instrument selected sources only (Zephyr `app` / single-binary targets).
+#   mulation_instrument_sources(app SOURCES src/foo.c src/bar.c)
+function(mulation_instrument_sources target)
+  cmake_parse_arguments(MIS "" "" "SOURCES" ${ARGN})
+  if(NOT TARGET ${target})
+    message(FATAL_ERROR "mulation_instrument_sources: target '${target}' does not exist")
+  endif()
+  if(NOT MIS_SOURCES)
+    message(FATAL_ERROR "mulation_instrument_sources: SOURCES is required")
+  endif()
+  foreach(_src IN LISTS MIS_SOURCES)
+    set_source_files_properties(${_src} PROPERTIES
+      COMPILE_OPTIONS "-g;-fpass-plugin=${MULATION_PLUGIN_PATH}")
+  endforeach()
+  if(TARGET mulation_plugin)
+    add_dependencies(${target} mulation_plugin)
+  endif()
+  if(TARGET ${MULATION_RUNTIME_TARGET})
+    target_link_libraries(${target} PRIVATE ${MULATION_RUNTIME_TARGET})
+    target_include_directories(${target} PRIVATE
+      $<TARGET_PROPERTY:${MULATION_RUNTIME_TARGET},INTERFACE_INCLUDE_DIRECTORIES>)
+  endif()
+endfunction()
+
+# Register a mutation gate. Creates mulation-check-<test_target> and wires it into
+# an umbrella `mulation-check` target (created on first call).
+#
+#   mulation_add_check(my_tests
+#     [MIN_SCORE N] [JOBS N] [TEST_FILTER pat] [FRAMEWORK name]
+#     [ARGS arg1 arg2 ...]          # appended after the test binary
+#     [BINARIES path1 path2 ...]    # extra --binary
+#     [COMMAND cmd [args...]]       # override command (default: $<TARGET_FILE:test_target>)
+#   )
 function(mulation_add_check test_target)
-  cmake_parse_arguments(MAC "" "MIN_SCORE" "" ${ARGN})
+  cmake_parse_arguments(MAC "" "MIN_SCORE;JOBS;TEST_FILTER;FRAMEWORK" "ARGS;BINARIES;COMMAND" ${ARGN})
   if(NOT MAC_MIN_SCORE)
     set(MAC_MIN_SCORE ${MULATION_MIN_SCORE})
   endif()
@@ -88,19 +123,44 @@ function(mulation_add_check test_target)
   if(MULATION_GIT_DIFF)
     list(APPEND _extra --git-diff)
   endif()
+  if(MAC_JOBS)
+    list(APPEND _extra -j ${MAC_JOBS})
+  endif()
+  if(MAC_TEST_FILTER)
+    list(APPEND _extra --test-filter ${MAC_TEST_FILTER})
+  endif()
+  if(MAC_FRAMEWORK)
+    list(APPEND _extra --framework ${MAC_FRAMEWORK})
+  endif()
+  foreach(_b IN LISTS MAC_BINARIES)
+    list(APPEND _extra --binary ${_b})
+  endforeach()
 
-  add_custom_target(mulation-check
+  if(MAC_COMMAND)
+    set(_cmd ${MAC_COMMAND})
+  else()
+    set(_cmd "$<TARGET_FILE:${test_target}>")
+  endif()
+
+  set(_check_target "mulation-check-${test_target}")
+  add_custom_target(${_check_target}
     COMMAND ${MULATION_RUNNER}
             --min-score ${MAC_MIN_SCORE}
             ${_extra}
-            -- $<TARGET_FILE:${test_target}>
+            -- ${_cmd} ${MAC_ARGS}
     DEPENDS ${test_target}
     USES_TERMINAL
-    COMMENT "Mutation campaign (prove tests would catch bugs before production)"
+    COMMENT "Mutation campaign for ${test_target}"
   )
   if(TARGET mulation-run)
-    add_dependencies(mulation-check mulation-run)
+    add_dependencies(${_check_target} mulation-run)
   elseif(TARGET mulation)
-    add_dependencies(mulation-check mulation)
+    add_dependencies(${_check_target} mulation)
   endif()
+
+  if(NOT TARGET mulation-check)
+    add_custom_target(mulation-check
+      COMMENT "Mutation campaign (all mulation-check-* targets)")
+  endif()
+  add_dependencies(mulation-check ${_check_target})
 endfunction()

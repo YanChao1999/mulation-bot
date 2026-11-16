@@ -13,6 +13,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
+#include <cctype>
+#include <cstdlib>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -31,6 +33,56 @@ struct MutantRec {
     std::string op;
     std::string mut;
 };
+
+static std::string toLowerAscii(StringRef s) {
+    std::string out(s.begin(), s.end());
+    for (char &c : out) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return out;
+}
+
+static const std::vector<std::string> &skipPathSubstrings() {
+    static const std::vector<std::string> cached = [] {
+        std::vector<std::string> out;
+        const char *env = std::getenv("MULATION_SKIP_PATHS");
+        if (!env || !env[0]) {
+            return out;
+        }
+        std::string cur;
+        for (const char *p = env;; ++p) {
+            if (*p == ':' || *p == '\0') {
+                if (!cur.empty()) {
+                    out.push_back(toLowerAscii(cur));
+                    cur.clear();
+                }
+                if (*p == '\0') {
+                    break;
+                }
+                continue;
+            }
+            cur.push_back(*p);
+        }
+        return out;
+    }();
+    return cached;
+}
+
+static bool isTestFilename(StringRef p) {
+    StringRef base = sys::path::filename(p);
+    if (base.ends_with("_test.cpp") || base.ends_with("_test.cc") || base.ends_with("_test.c") ||
+        base.ends_with("_test.cxx") || base.ends_with("Test.cpp") || base.ends_with("_test.C") ||
+        base.ends_with("_tests.cpp") || base.ends_with("_tests.cc") || base.ends_with("_tests.c") ||
+        base.ends_with("_tests.cxx")) {
+        return true;
+    }
+    if (base.starts_with("test_") &&
+        (base.ends_with(".cpp") || base.ends_with(".cc") || base.ends_with(".c") ||
+         base.ends_with(".cxx") || base.ends_with(".C"))) {
+        return true;
+    }
+    return false;
+}
 
 static uint32_t fnv1a(StringRef s) {
     uint32_t h = 2166136261u;
@@ -81,12 +133,23 @@ static bool skipPath(StringRef p) {
         lower.find("/gtest/") != std::string::npos ||
         lower.find("\\gtest\\") != std::string::npos ||
         lower.find("gtest_main") != std::string::npos ||
-        lower.find("/gmock/") != std::string::npos) {
+        lower.find("/gmock/") != std::string::npos ||
+        // Match the header name only — project dirs like examples/doctest/ must stay
+        // instrumentable.
+        lower.find("doctest.h") != std::string::npos ||
+        lower.find("/zephyr/") != std::string::npos ||
+        lower.find("\\zephyr\\") != std::string::npos ||
+        lower.find("/ztest/") != std::string::npos ||
+        lower.find("\\ztest\\") != std::string::npos) {
         return true;
     }
-    if (p.ends_with("_test.cpp") || p.ends_with("_test.cc") || p.ends_with("_test.c") ||
-        p.ends_with("_test.cxx") || p.ends_with("Test.cpp") || p.ends_with("_test.C")) {
+    if (isTestFilename(p)) {
         return true;
+    }
+    for (const std::string &sub : skipPathSubstrings()) {
+        if (lower.find(sub) != std::string::npos) {
+            return true;
+        }
     }
     // System / toolchain headers (paths may be relative via ../ from clang).
     if (lower.find("/usr/include/") != std::string::npos ||

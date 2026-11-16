@@ -1,6 +1,7 @@
 #ifndef MULATION_CLI_HPP
 #define MULATION_CLI_HPP
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -12,9 +13,18 @@ struct Options {
     int timeout_ms = 0;
     int jobs = 1;
     bool no_coverage = false;
+    bool allow_empty_coverage = false;
     std::string catalog_dir;
     std::string json_out;
+    std::string discover_cmd;
+    std::string test_filter;
+    std::string framework = "auto"; // auto|gtest|ctest|doctest|ztest|custom
+    std::string resolved_framework; // filled by apply_test_filter
     std::vector<std::string> binaries;
+    std::vector<std::string> filter;
+    std::vector<std::string> exclude;
+    std::vector<std::string> kinds;
+    std::vector<uint32_t> mutant_ids;
     std::vector<std::string> cmd;
 };
 

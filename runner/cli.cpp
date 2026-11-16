@@ -6,7 +6,7 @@
 std::string usage_text(const char *argv0) {
     const char *name = argv0 ? argv0 : "mulation";
     std::ostringstream out;
-    out << "mulation — mutation layer on Google Test / CTest\n"
+    out << "mulation — mutation layer on gtest / CTest / doctest / ZTEST / custom host ELF\n"
         << "Usage:\n"
         << "  " << name << " [options] [--] <test-binary> [args...]\n"
         << "  " << name << " [options] -- ctest [ctest-args...]\n"
@@ -15,11 +15,19 @@ std::string usage_text(const char *argv0) {
         << "\nOptions:\n"
         << "  --min-score N       Fail if kill rate is below N percent (CI gate)\n"
         << "  --git-diff [BASE]   Only mutants on lines changed vs BASE (default HEAD)\n"
+        << "  --filter SUBSTR     Keep mutants whose file contains SUBSTR (repeatable, OR)\n"
+        << "  --exclude SUBSTR    Drop mutants whose file contains SUBSTR (repeatable)\n"
+        << "  --kinds LIST        Comma-separated kinds to keep (e.g. ROR,AOR)\n"
+        << "  --mutant-id ID      Keep only this mutant id (repeatable)\n"
+        << "  --test-filter PAT   Framework-native test subset (see --framework)\n"
+        << "  --framework NAME    auto|gtest|ctest|doctest|ztest|custom (default auto)\n"
         << "  --timeout-ms N      Per-mutant timeout (default: 5x baseline + 1000ms)\n"
         << "  -j, --jobs N        Parallel mutant workers (default: 1)\n"
         << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
+        << "  --allow-empty-coverage  If hitlog is empty, run all mutants (default: fail)\n"
         << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
         << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
+        << "  --discover-cmd CMD  sh -c CMD; stdout lines are extra ELF paths\n"
         << "  --json-out FILE     Write machine-readable report\n"
         << "  -h, --help          Show this help\n";
     return out.str();
@@ -30,6 +38,28 @@ static ParseResult err(const char *argv0, const std::string &message) {
     r.kind = ParseKind::Error;
     r.message = message + "\n" + usage_text(argv0);
     return r;
+}
+
+static std::vector<std::string> split_csv(const std::string &s) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : s) {
+        if (c == ',') {
+            if (!cur.empty()) {
+                out.push_back(cur);
+                cur.clear();
+            }
+            continue;
+        }
+        if (c == ' ' || c == '\t') {
+            continue;
+        }
+        cur.push_back(c);
+    }
+    if (!cur.empty()) {
+        out.push_back(cur);
+    }
+    return out;
 }
 
 ParseResult parse_args(int argc, char **argv) {
@@ -95,6 +125,87 @@ ParseResult parse_args(int argc, char **argv) {
             ++i;
             continue;
         }
+        if (a == "--filter") {
+            if (!need("--filter")) {
+                return r;
+            }
+            o.filter.emplace_back(argv[++i]);
+            ++i;
+            continue;
+        }
+        if (a.rfind("--filter=", 0) == 0) {
+            o.filter.emplace_back(a.substr(9));
+            ++i;
+            continue;
+        }
+        if (a == "--exclude") {
+            if (!need("--exclude")) {
+                return r;
+            }
+            o.exclude.emplace_back(argv[++i]);
+            ++i;
+            continue;
+        }
+        if (a.rfind("--exclude=", 0) == 0) {
+            o.exclude.emplace_back(a.substr(10));
+            ++i;
+            continue;
+        }
+        if (a == "--kinds") {
+            if (!need("--kinds")) {
+                return r;
+            }
+            auto parts = split_csv(argv[++i]);
+            o.kinds.insert(o.kinds.end(), parts.begin(), parts.end());
+            ++i;
+            continue;
+        }
+        if (a.rfind("--kinds=", 0) == 0) {
+            auto parts = split_csv(a.substr(8));
+            o.kinds.insert(o.kinds.end(), parts.begin(), parts.end());
+            ++i;
+            continue;
+        }
+        if (a == "--mutant-id") {
+            if (!need("--mutant-id")) {
+                return r;
+            }
+            o.mutant_ids.push_back(static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10)));
+            ++i;
+            continue;
+        }
+        if (a.rfind("--mutant-id=", 0) == 0) {
+            o.mutant_ids.push_back(
+                static_cast<uint32_t>(std::strtoul(a.c_str() + 12, nullptr, 10)));
+            ++i;
+            continue;
+        }
+        if (a == "--test-filter") {
+            if (!need("--test-filter")) {
+                return r;
+            }
+            o.test_filter = argv[++i];
+            ++i;
+            continue;
+        }
+        if (a.rfind("--test-filter=", 0) == 0) {
+            o.test_filter = a.substr(14);
+            ++i;
+            continue;
+        }
+        if (a == "--framework") {
+            if (!need("--framework")) {
+                return r;
+            }
+            o.framework = argv[++i];
+            ++i;
+            continue;
+        }
+        if (a.rfind("--framework=", 0) == 0) {
+            o.framework = a.substr(12);
+            ++i;
+            continue;
+        }
         if (a == "--timeout-ms") {
             if (!need("--timeout-ms")) {
                 return r;
@@ -127,6 +238,11 @@ ParseResult parse_args(int argc, char **argv) {
             ++i;
             continue;
         }
+        if (a == "--allow-empty-coverage") {
+            o.allow_empty_coverage = true;
+            ++i;
+            continue;
+        }
         if (a == "--catalog-dir") {
             if (!need("--catalog-dir")) {
                 return r;
@@ -140,6 +256,19 @@ ParseResult parse_args(int argc, char **argv) {
                 return r;
             }
             o.binaries.emplace_back(argv[++i]);
+            ++i;
+            continue;
+        }
+        if (a == "--discover-cmd") {
+            if (!need("--discover-cmd")) {
+                return r;
+            }
+            o.discover_cmd = argv[++i];
+            ++i;
+            continue;
+        }
+        if (a.rfind("--discover-cmd=", 0) == 0) {
+            o.discover_cmd = a.substr(15);
             ++i;
             continue;
         }

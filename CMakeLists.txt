@@ -21,14 +21,16 @@ endif()
 execute_process(COMMAND ${LLVM_CONFIG} --cxxflags OUTPUT_VARIABLE LLVM_CXXFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND ${LLVM_CONFIG} --includedir OUTPUT_VARIABLE LLVM_INCLUDEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND ${LLVM_CONFIG} --libdir OUTPUT_VARIABLE LLVM_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${LLVM_CONFIG} --libs OUTPUT_VARIABLE LLVM_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 separate_arguments(LLVM_CXXFLAGS_LIST UNIX_COMMAND "${LLVM_CXXFLAGS}")
+separate_arguments(LLVM_LIBS_LIST UNIX_COMMAND "${LLVM_LIBS}")
 
 add_library(mulation_plugin SHARED plugin/MulationPass.cpp)
 target_include_directories(mulation_plugin PRIVATE ${LLVM_INCLUDEDIR})
 target_compile_options(mulation_plugin PRIVATE ${LLVM_CXXFLAGS_LIST} -fPIC -fno-rtti)
 target_link_directories(mulation_plugin PRIVATE ${LLVM_LIBDIR})
-target_link_libraries(mulation_plugin PRIVATE LLVM)
+target_link_libraries(mulation_plugin PRIVATE ${LLVM_LIBS_LIST})
 set_target_properties(mulation_plugin PROPERTIES
   PREFIX "lib"
   OUTPUT_NAME "mulation_plugin"
@@ -47,6 +49,8 @@ set(_runner_src
   runner/process.cpp
   runner/diff.cpp
   runner/cli.cpp
+  runner/filter.cpp
+  runner/test_filter.cpp
 )
 add_executable(mulation-run ${_runner_src})
 target_include_directories(mulation-run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
@@ -68,7 +72,7 @@ set(MULATION_PLUGIN_PATH "$<TARGET_FILE:mulation_plugin>" CACHE INTERNAL "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Mulation.cmake)
 
 option(MULATION_BUILD_TESTS "Build tool unit tests" ON)
-option(MULATION_BUILD_EXAMPLES "Build the gtest/CTest example" ON)
+option(MULATION_BUILD_EXAMPLES "Build the gtest/CTest/doctest examples" ON)
 if(MULATION_BUILD_TESTS OR MULATION_BUILD_EXAMPLES)
   enable_testing()
 endif()
@@ -81,12 +85,16 @@ if(MULATION_BUILD_TESTS)
     tests/process_test.cpp
     tests/cli_test.cpp
     tests/elf_catalog_test.cpp
+    tests/filter_test.cpp
+    tests/test_filter_test.cpp
   )
   set(_runner_lib_src
     runner/catalog.cpp
     runner/diff.cpp
     runner/process.cpp
     runner/cli.cpp
+    runner/filter.cpp
+    runner/test_filter.cpp
   )
   add_executable(mulation_unit_tests ${_unit_test_src} ${_runner_lib_src})
   target_include_directories(mulation_unit_tests PRIVATE
@@ -102,6 +110,8 @@ if(MULATION_BUILD_TESTS)
     tests/diff_test.cpp
     tests/cli_test.cpp
     tests/elf_catalog_test.cpp
+    tests/filter_test.cpp
+    tests/test_filter_test.cpp
   )
   set(_self_sut_src
     runner/catalog.cpp
@@ -119,7 +129,7 @@ if(MULATION_BUILD_TESTS)
     add_dependencies(mulation_self_sut mulation_plugin)
   endif()
   add_executable(mulation_self_tests ${_self_test_src} runner/process.cpp runner/cli.cpp
-                 $<TARGET_OBJECTS:mulation_self_sut>)
+                 runner/filter.cpp runner/test_filter.cpp $<TARGET_OBJECTS:mulation_self_sut>)
   target_include_directories(mulation_self_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
     ${CMAKE_CURRENT_SOURCE_DIR}/tests)
@@ -145,6 +155,7 @@ endif()
 
 if(MULATION_BUILD_EXAMPLES)
   add_subdirectory(examples/gtest-ctest)
+  add_subdirectory(examples/doctest)
 endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClangTools.cmake)

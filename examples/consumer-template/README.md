@@ -5,7 +5,7 @@ Copy-paste mutation gate for a C++ repo that already uses gtest / CTest / doctes
 ## 1. One-time install on the runner (or locally)
 
 ```bash
-curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh
+curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 sudo apt install clang-18 llvm-18-dev   # pass plugin needs LLVM 18
 ```
@@ -39,7 +39,7 @@ Edit `TEST_BINARY` (and optional `MIN_SCORE`) at the top of that file.
 
 ## What you get
 
-- PR / push runs: install `v0.0.4` → instrumented rebuild of *your* steps → `mulation --git-diff -j 4`
+- PR / push runs: install `v0.0.5` → instrumented rebuild of *your* steps → `mulation --git-diff -j 4`
 - Survived mutants on the PR diff become **review comments** (`comment-survivors`)
 - Score below `MIN_SCORE` fails the check
 

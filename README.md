@@ -46,14 +46,14 @@ mulation --framework=custom --test-filter only_me -- ./my_harness
 One command (Linux x86_64, installs to `$HOME/.local`):
 
 ```bash
-curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh
+curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Pin a version or prefix:
 
 ```bash
-MULATION_VERSION=v0.0.4 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh'
+MULATION_VERSION=v0.0.5 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh'
 ```
 
 Manual install from the release tarball:
@@ -129,7 +129,7 @@ Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
 
 `make test` dogfoods the tool: an instrumented `mulation_self_tests` binary (runner library + existing unit suite) is scored with `mulation-run --min-score 0`. Do not pad unit assertions just to raise that score — survivors are the signal.
 
-Publish a release: push a tag `v0.0.4` (workflow builds, tests, uploads the tarball + `install.sh`).  
+Publish a release: push a tag `v0.0.5` (workflow builds, tests, uploads the tarball + `install.sh`).  
 GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
 
 Install layout:
@@ -191,7 +191,7 @@ Reusable workflow (when the instrumented binary is already built in a prior job)
 ```yaml
 jobs:
   mulation:
-    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.4
+    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.5
     with:
       test-binary: ./build/my_tests   # already built with mulation c++
       min-score: "80"

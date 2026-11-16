@@ -133,7 +133,7 @@ mulation --allow-empty-coverage -- ./build/my_tests</code></pre>
           Linux x86_64 release + Clang/LLVM 18. One command installs to
           <code>$HOME/.local</code>; instrument the SUT once, flip mutants at runtime.
         </p>
-        <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.4/install.sh | sh
+        <pre class="cmd"><code>curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
 export MULATION_SKIP_PATHS=third_party/my_ut.h   # optional: custom UT headers
@@ -149,7 +149,7 @@ mulation_add_check(my_tests TEST_FILTER Adult.* JOBS 4)
         <p class="support">
           Prefer a tarball? Grab
           <a href="https://github.com/YanChao1999/mulation-bot/releases">Releases</a>
-          or pin <code>MULATION_VERSION=v0.0.4</code> when running the script.
+          or pin <code>MULATION_VERSION=v0.0.5</code> when running the script.
           Survived a mutant?
           <a href="https://github.com/YanChao1999/mulation-bot/blob/main/docs/weak-to-strong.md"
             >Weak → strong guide</a

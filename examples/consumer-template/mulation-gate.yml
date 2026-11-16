@@ -18,7 +18,7 @@ env:
   # --- edit these ---
   TEST_BINARY: ./build/compare_tests
   MIN_SCORE: "0"          # raise to 80 once the suite is strong enough
-  MULATION_VERSION: v0.0.4
+  MULATION_VERSION: v0.0.5
   JOBS: "4"
 
 jobs:

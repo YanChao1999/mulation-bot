@@ -4,6 +4,8 @@ CC ?= clang
 BUILD ?= build
 PREFIX ?= /usr/local
 WARNFLAGS ?= -Wall -Wextra -Wpedantic
+VERSION ?= 0.0.5
+VERSION_FLAGS := -DMULATION_VERSION=\"$(VERSION)\"
 
 PLUGIN := $(BUILD)/libmulation_plugin.so
 RUNTIME := $(BUILD)/libmulation_runtime.a
@@ -58,14 +60,14 @@ $(RUNTIME): $(BUILD)/mulation_runtime.o
 
 $(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp \
 		runner/filter.hpp runner/test_filter.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner $(RUNNER_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner $(RUNNER_SRC) -o $@
 
 $(MULATION): $(RUNNER)
 	ln -sfn mulation-run $@
 
 $(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp \
 		runner/cli.hpp runner/filter.hpp runner/test_filter.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) -Werror -pthread -Irunner -Itests $(UNIT_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner -Itests $(UNIT_SRC) -o $@
 
 # Same suite as UNIT; catalog/diff/cli compiled with the pass + runtime (dogfood).
 $(BUILD)/self_catalog.o: runner/catalog.cpp $(PLUGIN) | $(BUILD)
@@ -75,7 +77,7 @@ $(BUILD)/self_diff.o: runner/diff.cpp $(PLUGIN) | $(BUILD)
 	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c \
 		-fpass-plugin=$(abspath $(PLUGIN)) -Irunner -Iinclude $< -o $@
 $(BUILD)/self_cli.o: runner/cli.cpp | $(BUILD)
-	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) $(VERSION_FLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_process.o: runner/process.cpp | $(BUILD)
 	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_unit_main.o: tests/unit_main.cpp | $(BUILD)

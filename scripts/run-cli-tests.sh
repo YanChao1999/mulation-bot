@@ -17,6 +17,10 @@ ok() {
 "$runner" --help >/dev/null 2>&1 || fail "help"
 ok Cli.Help
 
+ver=$("$runner" --version) || fail "version"
+echo "$ver" | grep -q '^mulation ' || fail "version output: $ver"
+ok Cli.Version
+
 set +e
 "$runner" --min-score >/dev/null 2>&1
 code=$?

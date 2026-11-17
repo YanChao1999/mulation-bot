@@ -54,10 +54,12 @@ set(_runner_src
 )
 add_executable(mulation-run ${_runner_src})
 target_include_directories(mulation-run PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+target_compile_definitions(mulation-run PRIVATE MULATION_VERSION="${PROJECT_VERSION}")
 target_compile_options(mulation-run PRIVATE -Wall -Wextra -Wpedantic -Werror -pthread)
 target_link_options(mulation-run PRIVATE -pthread)
 add_executable(mulation ${_runner_src})
 target_include_directories(mulation PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+target_compile_definitions(mulation PRIVATE MULATION_VERSION="${PROJECT_VERSION}")
 target_compile_options(mulation PRIVATE -Wall -Wextra -Wpedantic -Werror -pthread)
 target_link_options(mulation PRIVATE -pthread)
 
@@ -100,6 +102,7 @@ if(MULATION_BUILD_TESTS)
   target_include_directories(mulation_unit_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
     ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  target_compile_definitions(mulation_unit_tests PRIVATE MULATION_VERSION="${PROJECT_VERSION}")
   target_compile_options(mulation_unit_tests PRIVATE -Wall -Wextra -Wpedantic -Werror -pthread)
   target_link_options(mulation_unit_tests PRIVATE -pthread)
   add_test(NAME mulation_unit_tests COMMAND mulation_unit_tests)

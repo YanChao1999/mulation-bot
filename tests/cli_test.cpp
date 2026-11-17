@@ -20,6 +20,14 @@ TEST(Cli, Help) {
     CHECK(r.message.find("Usage:") != std::string::npos);
 }
 
+TEST(Cli, Version) {
+    ParseResult r = parse({"--version"});
+    CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Version));
+    CHECK(r.message.find("mulation ") != std::string::npos);
+    ParseResult v = parse({"-V"});
+    CHECK_EQ(static_cast<int>(v.kind), static_cast<int>(ParseKind::Version));
+}
+
 TEST(Cli, MinScoreEqualsAndFlag) {
     ParseResult a = parse({"--min-score=80", "./tests"});
     CHECK_EQ(static_cast<int>(a.kind), static_cast<int>(ParseKind::Ok));

@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     }
 
     ParseResult parsed = parse_args(argc, argv);
-    if (parsed.kind == ParseKind::Help) {
+    if (parsed.kind == ParseKind::Help || parsed.kind == ParseKind::Version) {
         std::cout << parsed.message;
         return 0;
     }

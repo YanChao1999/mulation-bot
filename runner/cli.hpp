@@ -28,7 +28,7 @@ struct Options {
     std::vector<std::string> cmd;
 };
 
-enum class ParseKind { Ok, Help, Error };
+enum class ParseKind { Ok, Help, Version, Error };
 
 struct ParseResult {
     ParseKind kind = ParseKind::Ok;

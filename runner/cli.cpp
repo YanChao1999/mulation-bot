@@ -3,6 +3,10 @@
 #include <cstdlib>
 #include <sstream>
 
+#ifndef MULATION_VERSION
+#define MULATION_VERSION "0.0.5"
+#endif
+
 std::string usage_text(const char *argv0) {
     const char *name = argv0 ? argv0 : "mulation";
     std::ostringstream out;
@@ -29,6 +33,7 @@ std::string usage_text(const char *argv0) {
         << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
         << "  --discover-cmd CMD  sh -c CMD; stdout lines are extra ELF paths\n"
         << "  --json-out FILE     Write machine-readable report\n"
+        << "  -V, --version       Print version and exit\n"
         << "  -h, --help          Show this help\n";
     return out.str();
 }
@@ -79,6 +84,11 @@ ParseResult parse_args(int argc, char **argv) {
         if (a == "-h" || a == "--help") {
             r.kind = ParseKind::Help;
             r.message = usage_text(argv0);
+            return r;
+        }
+        if (a == "-V" || a == "--version") {
+            r.kind = ParseKind::Version;
+            r.message = std::string("mulation ") + MULATION_VERSION + "\n";
             return r;
         }
         auto need = [&](const char *opt) -> bool {

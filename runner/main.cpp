@@ -380,6 +380,9 @@ int main(int argc, char **argv) {
     if (jobs > 1) {
         std::cout << ", jobs=" << jobs;
     }
+    if (opt.max_survivors > 0) {
+        std::cout << ", max-survivors=" << opt.max_survivors;
+    }
     std::cout << "\n";
 
     for (const Mutant &m : mutants) {
@@ -397,15 +400,24 @@ int main(int argc, char **argv) {
         bool is_killed = false;
         bool is_timeout = false;
         bool is_survived = false;
+        bool ran = false;
     };
     std::vector<Outcome> outcomes(todo.size());
     std::atomic<size_t> next{0};
+    std::atomic<int> survivor_hits{0};
+    std::atomic<bool> stop_scheduling{false};
     std::mutex print_mu;
 
     auto worker = [&]() {
         while (true) {
+            if (opt.max_survivors > 0 && stop_scheduling.load()) {
+                break;
+            }
             size_t i = next.fetch_add(1);
             if (i >= todo.size()) {
+                break;
+            }
+            if (opt.max_survivors > 0 && stop_scheduling.load()) {
                 break;
             }
             const Mutant *m = todo[i];
@@ -413,6 +425,7 @@ int main(int argc, char **argv) {
             Outcome o;
             o.order = i;
             o.m = m;
+            o.ran = true;
             if (rr.status == RunStatus::Timeout) {
                 o.cls = "timeout";
                 o.is_timeout = true;
@@ -420,6 +433,10 @@ int main(int argc, char **argv) {
             } else if (rr.status == RunStatus::Pass) {
                 o.cls = "survived";
                 o.is_survived = true;
+                const int hit = survivor_hits.fetch_add(1) + 1;
+                if (opt.max_survivors > 0 && hit >= opt.max_survivors) {
+                    stop_scheduling.store(true);
+                }
             } else {
                 o.cls = "killed";
                 o.is_killed = true;
@@ -446,10 +463,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    int ran_n = 0;
     for (const Outcome &o : outcomes) {
-        if (!o.m) {
+        if (!o.m || !o.ran) {
             continue;
         }
+        ++ran_n;
         if (o.is_timeout) {
             ++timeout_n;
         }
@@ -462,6 +481,9 @@ int main(int argc, char **argv) {
         }
     }
 
+    const bool truncated = opt.max_survivors > 0 && ran_n < static_cast<int>(todo.size());
+    // Uncovered sites always count as survived; with --max-survivors they are still
+    // listed but early-stop only applies to executed mutants.
     survived += static_cast<int>(uncovered.size());
     // Timeouts are reported but excluded from the score: hang-prone loop mutants
     // otherwise inflate "killed" without proving an assertion caught the fault.
@@ -476,6 +498,10 @@ int main(int argc, char **argv) {
     std::cout << "  timeout:   " << timeout_n << " (excluded from score)\n";
     if (!uncovered.empty()) {
         std::cout << "  uncovered: " << uncovered.size() << " (counted as survived)\n";
+    }
+    if (truncated) {
+        std::cout << "  ran:       " << ran_n << "/" << todo.size()
+                  << " (stopped early via --max-survivors)\n";
     }
     std::cout << "  score:     " << score << "%\n";
 
@@ -497,28 +523,91 @@ int main(int argc, char **argv) {
         }
     }
 
+    auto emit_survivor_json = [&](std::ostream &js, const Mutant &m, bool &first) {
+        if (!first) {
+            js << ",";
+        }
+        first = false;
+        js << "{\"id\":" << m.id << ",\"file\":\"" << json_escape(m.file)
+           << "\",\"line\":" << m.line << ",\"kind\":\"" << json_escape(m.kind) << "\",\"op\":\""
+           << json_escape(m.op) << "\",\"mut\":\"" << json_escape(m.mut) << "\"}";
+    };
+
     if (!opt.json_out.empty()) {
         std::ofstream js(opt.json_out);
         js << "{\"killed\":" << killed_scored << ",\"survived\":" << survived
-           << ",\"timeout\":" << timeout_n << ",\"score\":" << score << ",\"survivors\":[";
+           << ",\"timeout\":" << timeout_n << ",\"score\":" << score;
+        if (truncated) {
+            js << ",\"truncated\":true,\"ran\":" << ran_n << ",\"scheduled\":" << todo.size();
+        }
+        js << ",\"survivors\":[";
         bool first = true;
-        auto emit = [&](const Mutant &m) {
-            if (!first) {
-                js << ",";
-            }
-            first = false;
-            js << "{\"id\":" << m.id << ",\"file\":\"" << json_escape(m.file)
-               << "\",\"line\":" << m.line << ",\"kind\":\"" << json_escape(m.kind)
-               << "\",\"op\":\"" << json_escape(m.op) << "\",\"mut\":\"" << json_escape(m.mut)
-               << "\"}";
-        };
         for (const Mutant &m : survivors) {
-            emit(m);
+            emit_survivor_json(js, m, first);
         }
         for (const Mutant &m : uncovered) {
-            emit(m);
+            emit_survivor_json(js, m, first);
         }
         js << "]}\n";
+    }
+
+    if (!opt.sarif_out.empty()) {
+        char cwd_buf[4096];
+        std::string cwd;
+        if (getcwd(cwd_buf, sizeof(cwd_buf))) {
+            cwd = cwd_buf;
+            if (!cwd.empty() && cwd.back() != '/') {
+                cwd.push_back('/');
+            }
+        }
+        auto uri_for = [&](std::string path) {
+            if (!cwd.empty() && path.rfind(cwd, 0) == 0) {
+                path = path.substr(cwd.size());
+            }
+            return path;
+        };
+#ifndef MULATION_VERSION
+#define MULATION_VERSION "0.0.6"
+#endif
+        std::ofstream sarif(opt.sarif_out);
+        sarif << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\","
+              << "\"version\":\"2.1.0\",\"runs\":[{"
+              << "\"tool\":{\"driver\":{"
+              << "\"name\":\"mulation\",\"version\":\"" << MULATION_VERSION << "\","
+              << "\"informationUri\":\"https://github.com/YanChao1999/mulation-bot\","
+              << "\"rules\":[{\"id\":\"survived-mutant\","
+              << "\"shortDescription\":{\"text\":\"Surviving mutant\"},"
+              << "\"fullDescription\":{\"text\":\"A deliberate fault was not detected by the "
+                 "test suite.\"},"
+              << "\"defaultConfiguration\":{\"level\":\"warning\"}}]}},\"results\":[";
+        bool first = true;
+        auto emit_sarif = [&](const Mutant &m, const char *extra) {
+            if (!first) {
+                sarif << ",";
+            }
+            first = false;
+            std::string msg = "[" + m.kind + "] `" + m.op + "` -> `" + m.mut + "`";
+            if (extra) {
+                msg += " ";
+                msg += extra;
+            }
+            sarif << "{\"ruleId\":\"survived-mutant\",\"level\":\"warning\","
+                  << "\"message\":{\"text\":\"" << json_escape(msg) << "\"},"
+                  << "\"locations\":[{\"physicalLocation\":{"
+                  << "\"artifactLocation\":{\"uri\":\"" << json_escape(uri_for(m.file)) << "\"},"
+                  << "\"region\":{\"startLine\":" << (m.line ? m.line : 1);
+            if (m.col > 0) {
+                sarif << ",\"startColumn\":" << m.col;
+            }
+            sarif << "}}}]}";
+        };
+        for (const Mutant &m : survivors) {
+            emit_sarif(m, nullptr);
+        }
+        for (const Mutant &m : uncovered) {
+            emit_sarif(m, "[not covered]");
+        }
+        sarif << "],\"columnKind\":\"utf16CodeUnits\"}]}\n";
     }
 
     if (opt.min_score_set && score + 1e-9 < opt.min_score) {

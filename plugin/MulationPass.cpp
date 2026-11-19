@@ -1,3 +1,5 @@
+#include "mulation/mute_lines.hpp"
+
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
@@ -9,6 +11,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
@@ -17,6 +20,7 @@
 #include <cstdlib>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -163,6 +167,20 @@ static bool skipPath(StringRef p) {
     return false;
 }
 
+static const std::vector<bool> &muteMaskForFile(const std::string &file) {
+    static std::unordered_map<std::string, std::vector<bool>> cache;
+    auto it = cache.find(file);
+    if (it != cache.end()) {
+        return it->second;
+    }
+    std::vector<bool> mask;
+    if (auto buf = MemoryBuffer::getFile(file)) {
+        mask = mulation_mute_mask((*buf)->getBuffer());
+    }
+    auto [ins, _] = cache.emplace(file, std::move(mask));
+    return ins->second;
+}
+
 static bool locOf(const Instruction *I, std::string &file, unsigned &line, unsigned &col) {
     const DebugLoc &DL = I->getDebugLoc();
     if (!DL) {
@@ -177,7 +195,10 @@ static bool locOf(const Instruction *I, std::string &file, unsigned &line, unsig
                 }
                 line = SP->getLine();
                 col = 0;
-                return line != 0 && !file.empty() && !skipPath(file);
+                if (line == 0 || file.empty() || skipPath(file)) {
+                    return false;
+                }
+                return !mulation_line_muted(muteMaskForFile(file), line);
             }
         }
         return false;
@@ -194,7 +215,10 @@ static bool locOf(const Instruction *I, std::string &file, unsigned &line, unsig
             file = full.str().str();
         }
     }
-    return line != 0 && !file.empty() && !skipPath(file);
+    if (line == 0 || file.empty() || skipPath(file)) {
+        return false;
+    }
+    return !mulation_line_muted(muteMaskForFile(file), line);
 }
 
 static const char *predName(CmpInst::Predicate P) {
@@ -652,7 +676,7 @@ class MulationInstrumentPass : public PassInfoMixin<MulationInstrumentPass> {
 } // namespace
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
-    return {LLVM_PLUGIN_API_VERSION, "mulation", "0.0.5", [](PassBuilder &PB) {
+    return {LLVM_PLUGIN_API_VERSION, "mulation", "0.0.6", [](PassBuilder &PB) {
                 PB.registerPipelineStartEPCallback([](ModulePassManager &MPM, OptimizationLevel) {
                     MPM.addPass(MulationInstrumentPass());
                 });

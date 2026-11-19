@@ -21,6 +21,10 @@ ver=$("$runner" --version) || fail "version"
 echo "$ver" | grep -q '^mulation ' || fail "version output: $ver"
 ok Cli.Version
 
+"$runner" --help 2>/dev/null | grep -q -- '--sarif-out' || fail "help missing --sarif-out"
+"$runner" --help 2>/dev/null | grep -q -- '--max-survivors' || fail "help missing --max-survivors"
+ok Cli.HelpNewFlags
+
 set +e
 "$runner" --min-score >/dev/null 2>&1
 code=$?

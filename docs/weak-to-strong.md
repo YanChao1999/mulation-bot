@@ -52,6 +52,17 @@ That pair kills the ROR boundary mutants. Prefer **on/off pairs** at the contrac
 
 If mulation exits with “coverage hitlog is empty”, the process likely skipped `atexit` (e.g. `_exit` / some `native_sim` paths), so `MULATION_HITLOG` never flushed. Prefer a normal `exit`, or temporarily use `--allow-empty-coverage` / `--no-coverage` while you fix the exit path.
 
-## PR comments
+## Skip noisy / equivalent sites
 
-With the reusable workflow (`comment-survivors: true`), survived sites become review comments on the changed lines. Treat them like review nits: either strengthen the test or document why the mutant is equivalent.
+When a site is intentionally equivalent or too noisy for a gate:
+
+```c
+// mulation:off
+int hash = a + b;   // not instrumented until on
+// mulation:on
+int edge = x >= 18; // mulation:skip
+```
+
+## PR comments / SARIF
+
+With the reusable workflow (`comment-survivors: true`), survived sites become review comments on the changed lines. Set `upload-sarif: true` to push `--sarif-out` into GitHub Code Scanning. Treat survivors like review nits: either strengthen the test or document why the mutant is equivalent (or mute it).

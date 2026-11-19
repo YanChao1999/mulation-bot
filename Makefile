@@ -4,7 +4,7 @@ CC ?= clang
 BUILD ?= build
 PREFIX ?= /usr/local
 WARNFLAGS ?= -Wall -Wextra -Wpedantic
-VERSION ?= 0.0.5
+VERSION ?= 0.0.6
 VERSION_FLAGS := -DMULATION_VERSION=\"$(VERSION)\"
 
 PLUGIN := $(BUILD)/libmulation_plugin.so
@@ -28,7 +28,7 @@ RUNNER_SRC := runner/main.cpp runner/catalog.cpp runner/process.cpp runner/diff.
 # Do not pad assertions to chase 100% — report the score.
 UNIT_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
 	tests/process_test.cpp tests/cli_test.cpp tests/elf_catalog_test.cpp \
-	tests/filter_test.cpp tests/test_filter_test.cpp
+	tests/filter_test.cpp tests/test_filter_test.cpp tests/mute_lines_test.cpp
 RUNNER_LIB_SRC := runner/catalog.cpp runner/diff.cpp runner/process.cpp runner/cli.cpp \
 	runner/filter.cpp runner/test_filter.cpp
 UNIT_SRC := $(UNIT_TEST_SRC) $(RUNNER_LIB_SRC)
@@ -37,7 +37,7 @@ SELF_SUT_SRC := runner/catalog.cpp runner/diff.cpp
 # Self-mutation suite: skip process_test (timeouts) and instrumented cli.
 SELF_TEST_SRC := tests/unit_main.cpp tests/catalog_test.cpp tests/diff_test.cpp \
 	tests/cli_test.cpp tests/elf_catalog_test.cpp tests/filter_test.cpp \
-	tests/test_filter_test.cpp
+	tests/test_filter_test.cpp tests/mute_lines_test.cpp
 SELF_PLAIN_SRC := $(SELF_TEST_SRC)
 
 .PHONY: all example test lint tidy format format-check check clean install install-smoke package
@@ -47,8 +47,8 @@ all: $(PLUGIN) $(RUNTIME) $(RUNNER) $(MULATION)
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(PLUGIN): plugin/MulationPass.cpp | $(BUILD)
-	$(PLUGIN_CXX) -shared -fPIC $(PLUGIN_CXXFLAGS) $< -o $@ \
+$(PLUGIN): plugin/MulationPass.cpp include/mulation/mute_lines.hpp | $(BUILD)
+	$(PLUGIN_CXX) -shared -fPIC $(PLUGIN_CXXFLAGS) -Iinclude $< -o $@ \
 		-L$(LLVM_LIBDIR) $(LLVM_LIBS) \
 		-Wl,-rpath,$(LLVM_LIBDIR)
 
@@ -60,14 +60,15 @@ $(RUNTIME): $(BUILD)/mulation_runtime.o
 
 $(RUNNER): $(RUNNER_SRC) runner/catalog.hpp runner/process.hpp runner/diff.hpp runner/cli.hpp \
 		runner/filter.hpp runner/test_filter.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner $(RUNNER_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner -Iinclude $(RUNNER_SRC) -o $@
 
 $(MULATION): $(RUNNER)
 	ln -sfn mulation-run $@
 
-$(UNIT): $(UNIT_SRC) tests/unit_check.hpp runner/catalog.hpp runner/diff.hpp runner/process.hpp \
+$(UNIT): $(UNIT_SRC) tests/unit_check.hpp include/mulation/mute_lines.hpp \
+		runner/catalog.hpp runner/diff.hpp runner/process.hpp \
 		runner/cli.hpp runner/filter.hpp runner/test_filter.hpp | $(BUILD)
-	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner -Itests $(UNIT_SRC) -o $@
+	$(CXX) -std=c++17 -O2 $(WARNFLAGS) $(VERSION_FLAGS) -Werror -pthread -Irunner -Itests -Iinclude $(UNIT_SRC) -o $@
 
 # Same suite as UNIT; catalog/diff/cli compiled with the pass + runtime (dogfood).
 $(BUILD)/self_catalog.o: runner/catalog.cpp $(PLUGIN) | $(BUILD)
@@ -98,19 +99,21 @@ $(BUILD)/self_test_filter.o: runner/test_filter.cpp | $(BUILD)
 	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner $< -o $@
 $(BUILD)/self_test_filter_test.o: tests/test_filter_test.cpp | $(BUILD)
 	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Irunner -Itests $< -o $@
+$(BUILD)/self_mute_lines_test.o: tests/mute_lines_test.cpp include/mulation/mute_lines.hpp | $(BUILD)
+	$(CXX) -std=c++17 -O0 -g -fPIC $(WARNFLAGS) -Werror -c -Itests -Iinclude $< -o $@
 
 # process.o linked for git_diff_ranges; process_test omitted (timeouts).
 $(SELF): $(BUILD)/self_catalog.o $(BUILD)/self_diff.o $(BUILD)/self_cli.o $(BUILD)/self_process.o \
 		$(BUILD)/self_filter.o $(BUILD)/self_test_filter.o \
 		$(BUILD)/self_unit_main.o $(BUILD)/self_catalog_test.o $(BUILD)/self_diff_test.o \
 		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o $(BUILD)/self_filter_test.o \
-		$(BUILD)/self_test_filter_test.o \
+		$(BUILD)/self_test_filter_test.o $(BUILD)/self_mute_lines_test.o \
 		$(RUNTIME)
 	$(CXX) $(BUILD)/self_catalog.o $(BUILD)/self_diff.o $(BUILD)/self_cli.o $(BUILD)/self_process.o \
 		$(BUILD)/self_filter.o $(BUILD)/self_test_filter.o \
 		$(BUILD)/self_unit_main.o $(BUILD)/self_catalog_test.o $(BUILD)/self_diff_test.o \
 		$(BUILD)/self_cli_test.o $(BUILD)/self_elf_catalog_test.o $(BUILD)/self_filter_test.o \
-		$(BUILD)/self_test_filter_test.o \
+		$(BUILD)/self_test_filter_test.o $(BUILD)/self_mute_lines_test.o \
 		$(RUNTIME) -o $@
 
 $(RUNTIME_TEST): tests/runtime_test.c $(RUNTIME) include/mulation/mulation.h | $(BUILD)

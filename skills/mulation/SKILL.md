@@ -29,7 +29,9 @@ mulation --git-diff --min-score 80 -j 4 -- ctest --test-dir build
 ```
 
 Keep campaigns cheap on PRs: prefer `--git-diff`, then slim with `--filter` /
-`--exclude` / `--kinds` / `--test-filter` / `--mutant-id`.
+`--exclude` / `--kinds` / `--test-filter` / `--mutant-id` / `--max-survivors`.
+Emit `--sarif-out` for GitHub Code Scanning. Skip noisy sites with
+`// mulation:off` … `// mulation:on` or `// mulation:skip` on a line.
 
 ## Instrument the SUT only
 

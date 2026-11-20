@@ -570,16 +570,16 @@ int main(int argc, char **argv) {
 #define MULATION_VERSION "0.0.6"
 #endif
         std::ofstream sarif(opt.sarif_out);
-        sarif << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\","
-              << "\"version\":\"2.1.0\",\"runs\":[{"
-              << "\"tool\":{\"driver\":{"
-              << "\"name\":\"mulation\",\"version\":\"" << MULATION_VERSION << "\","
-              << "\"informationUri\":\"https://github.com/YanChao1999/mulation-bot\","
-              << "\"rules\":[{\"id\":\"survived-mutant\","
-              << "\"shortDescription\":{\"text\":\"Surviving mutant\"},"
-              << "\"fullDescription\":{\"text\":\"A deliberate fault was not detected by the "
-                 "test suite.\"},"
-              << "\"defaultConfiguration\":{\"level\":\"warning\"}}]}},\"results\":[";
+        sarif << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\",";
+        sarif << "\"version\":\"2.1.0\",\"runs\":[{";
+        sarif << "\"tool\":{\"driver\":{";
+        sarif << "\"name\":\"mulation\",\"version\":\"" << MULATION_VERSION << "\",";
+        sarif << "\"informationUri\":\"https://github.com/YanChao1999/mulation-bot\",";
+        sarif << "\"rules\":[{\"id\":\"survived-mutant\",";
+        sarif << "\"shortDescription\":{\"text\":\"Surviving mutant\"},";
+        sarif << "\"fullDescription\":{\"text\":\"A deliberate fault was not detected by the "
+                 "test suite.\"},";
+        sarif << "\"defaultConfiguration\":{\"level\":\"warning\"}}]}},\"results\":[";
         bool first = true;
         auto emit_sarif = [&](const Mutant &m, const char *extra) {
             if (!first) {
@@ -591,11 +591,11 @@ int main(int argc, char **argv) {
                 msg += " ";
                 msg += extra;
             }
-            sarif << "{\"ruleId\":\"survived-mutant\",\"level\":\"warning\","
-                  << "\"message\":{\"text\":\"" << json_escape(msg) << "\"},"
-                  << "\"locations\":[{\"physicalLocation\":{"
-                  << "\"artifactLocation\":{\"uri\":\"" << json_escape(uri_for(m.file)) << "\"},"
-                  << "\"region\":{\"startLine\":" << (m.line ? m.line : 1);
+            sarif << "{\"ruleId\":\"survived-mutant\",\"level\":\"warning\",";
+            sarif << "\"message\":{\"text\":\"" << json_escape(msg) << "\"},";
+            sarif << "\"locations\":[{\"physicalLocation\":{";
+            sarif << "\"artifactLocation\":{\"uri\":\"" << json_escape(uri_for(m.file)) << "\"},";
+            sarif << "\"region\":{\"startLine\":" << (m.line ? m.line : 1);
             if (m.col > 0) {
                 sarif << ",\"startColumn\":" << m.col;
             }

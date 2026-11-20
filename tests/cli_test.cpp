@@ -68,6 +68,16 @@ TEST(Cli, NoCoverageBinaryAndJsonOut) {
     CHECK_EQ(r.options.cmd[0], std::string("./suite"));
 }
 
+TEST(Cli, SarifAndMaxSurvivors) {
+    ParseResult r = parse({"--sarif-out=out.sarif", "--max-survivors", "3", "./suite"});
+    CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Ok));
+    CHECK_EQ(r.options.sarif_out, std::string("out.sarif"));
+    CHECK_EQ(r.options.max_survivors, 3);
+
+    ParseResult bad = parse({"--max-survivors", "-1", "./suite"});
+    CHECK_EQ(static_cast<int>(bad.kind), static_cast<int>(ParseKind::Error));
+}
+
 TEST(Cli, UnknownOptionIsError) {
     ParseResult r = parse({"--not-a-real-flag", "./t"});
     CHECK_EQ(static_cast<int>(r.kind), static_cast<int>(ParseKind::Error));

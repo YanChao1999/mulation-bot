@@ -1,10 +1,10 @@
 #!/bin/sh
 # Install mulation-bot from a GitHub Release tarball into PREFIX (default: $HOME/.local).
 #
-#   curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh
+#   MULATION_VERSION=v0.0.6 sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.6/install.sh | sh'
 #
 # Environment:
-#   MULATION_VERSION  Release tag (default: latest), e.g. v0.0.5
+#   MULATION_VERSION  Release tag (default: API latest, else embedded pin), e.g. v0.0.6
 #   PREFIX            Install root (default: $HOME/.local)
 #   MULATION_REPO     GitHub repo (default: YanChao1999/mulation-bot)
 set -eu
@@ -12,6 +12,8 @@ set -eu
 REPO=${MULATION_REPO:-YanChao1999/mulation-bot}
 PREFIX=${PREFIX:-${HOME}/.local}
 VERSION=${MULATION_VERSION:-}
+# Embedded pin so anonymous GitHub API rate limits do not break install.
+DEFAULT_VERSION=v0.0.6
 
 GITHUB_API="https://api.github.com"
 CURL_FLAGS="-fsSL -H Accept:application/vnd.github+json -H User-Agent:mulation-install"
@@ -48,12 +50,13 @@ need_cmd cp
 
 if [ -z "$VERSION" ]; then
     VERSION=$(
-        gh_curl "${GITHUB_API}/repos/${REPO}/releases/latest" |
+        gh_curl "${GITHUB_API}/repos/${REPO}/releases/latest" 2>/dev/null |
             sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-            head -n 1
+            head -n 1 || true
     )
     if [ -z "$VERSION" ]; then
-        fail "could not resolve latest release for ${REPO} (no release yet, or GitHub API blocked — set MULATION_VERSION=v0.0.5)"
+        VERSION=$DEFAULT_VERSION
+        echo "mulation install: GitHub API unavailable; falling back to ${VERSION}" >&2
     fi
 fi
 

@@ -25,9 +25,23 @@ mulation --git-diff --min-score 80 -j 4 -- ./build/my_tests
 mulation --git-diff --min-score 80 -j 4 -- ctest --test-dir build
 # slim the mutant set further when useful:
 mulation --git-diff --filter src/ --kinds ROR,AOR -- ./build/my_tests
+# fail-fast triage + Code Scanning:
+mulation --git-diff --min-score 80 --max-survivors 5 \
+  --json-out report.json --sarif-out report.sarif -- ./build/my_tests
 ```
 
 `-j` / `--jobs N` runs mutant replays in parallel (default `1`).
+`--max-survivors N` stops scheduling after N survivors (partial score; good for PR triage).
+`--sarif-out` writes SARIF 2.1.0 for GitHub Code Scanning.
+
+Skip instrumentation on known-equivalent or noisy lines:
+
+```c
+// mulation:off
+int noisy = a + b;  // not mutated
+// mulation:on
+int edge = x >= 18; // mulation:skip
+```
 
 Wire that after a green unit run. Full-suite mutation without `--git-diff` is usually too slow for every PR.
 
@@ -46,14 +60,15 @@ mulation --framework=custom --test-filter only_me -- ./my_harness
 One command (Linux x86_64, installs to `$HOME/.local`):
 
 ```bash
-curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh
+# Prefer pinning so GitHub API rate limits cannot break resolve-latest:
+MULATION_VERSION=v0.0.6 sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.6/install.sh | sh'
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Pin a version or prefix:
+Pin a prefix (and always pass `MULATION_VERSION` into the `sh -c` so the installer sees it):
 
 ```bash
-MULATION_VERSION=v0.0.5 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.5/install.sh | sh'
+MULATION_VERSION=v0.0.6 PREFIX=$HOME/.local sh -c 'curl -fsSL https://github.com/YanChao1999/mulation-bot/releases/download/v0.0.6/install.sh | sh'
 ```
 
 Manual install from the release tarball:
@@ -129,7 +144,7 @@ Verbose internal unit names: `MULATION_TEST_VERBOSE=1 make test`.
 
 `make test` dogfoods the tool: an instrumented `mulation_self_tests` binary (runner library + existing unit suite) is scored with `mulation-run --min-score 0`. Do not pad unit assertions just to raise that score — survivors are the signal.
 
-Publish a release: push a tag `v0.0.5` (workflow builds, tests, uploads the tarball + `install.sh`).  
+Publish a release: push a tag `v0.0.6` (workflow builds, tests, uploads the tarball + `install.sh`).  
 GitHub Pages: enable **Settings → Pages → Source: GitHub Actions** (workflow deploys `docs/`).
 
 Install layout:
@@ -191,7 +206,7 @@ Reusable workflow (when the instrumented binary is already built in a prior job)
 ```yaml
 jobs:
   mulation:
-    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.5
+    uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.6
     with:
       test-binary: ./build/my_tests   # already built with mulation c++
       min-score: "80"

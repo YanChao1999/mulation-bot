@@ -3,7 +3,7 @@
 # Consumer example:
 #   jobs:
 #     mulation:
-#       uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.5
+#       uses: YanChao1999/mulation-bot/.github/workflows/mulation.yml@v0.0.6
 #       with:
 #         test-binary: ./build/my_tests
 #         min-score: "80"
@@ -47,10 +47,10 @@ on:
         required: false
         default: ""
       mulation-version:
-        description: Release tag to install (e.g. v0.0.5); empty = latest
+        description: Release tag to install (e.g. v0.0.6); empty = latest
         type: string
         required: false
-        default: "v0.0.5"
+        default: "v0.0.6"
       comment-survivors:
         description: Post PR review comments for survived mutants
         type: boolean
@@ -66,6 +66,16 @@ on:
         type: string
         required: false
         default: "4"
+      max-survivors:
+        description: Stop after N survivors (0 = no limit)
+        type: string
+        required: false
+        default: "0"
+      upload-sarif:
+        description: Upload survivors as GitHub Code Scanning SARIF
+        type: boolean
+        required: false
+        default: false
     secrets:
       # Optional; default GITHUB_TOKEN is used for PR comments when granted.
       token:
@@ -74,6 +84,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  security-events: write
 
 jobs:
   gate:
@@ -122,11 +133,17 @@ jobs:
           GIT_DIFF: ${{ inputs.git-diff }}
           GIT_BASE: ${{ steps.base.outputs.ref }}
           JOBS: ${{ inputs.jobs }}
+          MAX_SURVIVORS: ${{ inputs.max-survivors }}
         run: |
           set -eu
           report="${{ runner.temp }}/mulation-report.json"
+          sarif="${{ runner.temp }}/mulation-report.sarif"
           echo "report=$report" >> "$GITHUB_OUTPUT"
-          args="--min-score ${MIN_SCORE} --json-out ${report} -j ${JOBS}"
+          echo "sarif=$sarif" >> "$GITHUB_OUTPUT"
+          args="--min-score ${MIN_SCORE} --json-out ${report} --sarif-out ${sarif} -j ${JOBS}"
+          if [ "${MAX_SURVIVORS}" != "0" ] && [ -n "${MAX_SURVIVORS}" ]; then
+            args="${args} --max-survivors ${MAX_SURVIVORS}"
+          fi
           if [ "${GIT_DIFF}" = "true" ]; then
             args="${args} --git-diff=${GIT_BASE}"
           fi
@@ -140,6 +157,12 @@ jobs:
             echo "set test-binary or test-command" >&2
             exit 2
           fi
+
+      - name: Upload SARIF to Code Scanning
+        if: always() && inputs.upload-sarif
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ runner.temp }}/mulation-report.sarif
 
       - name: Comment survived mutants on PR
         if: always() && inputs.comment-survivors && github.event_name == 'pull_request'

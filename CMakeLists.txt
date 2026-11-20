@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mulation-bot VERSION 0.0.5 LANGUAGES C CXX)
+project(mulation-bot VERSION 0.0.6 LANGUAGES C CXX)
 
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   message(WARNING "Build the pass plugin with Clang: cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang")
@@ -27,7 +27,9 @@ separate_arguments(LLVM_CXXFLAGS_LIST UNIX_COMMAND "${LLVM_CXXFLAGS}")
 separate_arguments(LLVM_LIBS_LIST UNIX_COMMAND "${LLVM_LIBS}")
 
 add_library(mulation_plugin SHARED plugin/MulationPass.cpp)
-target_include_directories(mulation_plugin PRIVATE ${LLVM_INCLUDEDIR})
+target_include_directories(mulation_plugin PRIVATE
+  ${LLVM_INCLUDEDIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_options(mulation_plugin PRIVATE ${LLVM_CXXFLAGS_LIST} -fPIC -fno-rtti)
 target_link_directories(mulation_plugin PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(mulation_plugin PRIVATE ${LLVM_LIBS_LIST})
@@ -89,6 +91,7 @@ if(MULATION_BUILD_TESTS)
     tests/elf_catalog_test.cpp
     tests/filter_test.cpp
     tests/test_filter_test.cpp
+    tests/mute_lines_test.cpp
   )
   set(_runner_lib_src
     runner/catalog.cpp
@@ -101,7 +104,8 @@ if(MULATION_BUILD_TESTS)
   add_executable(mulation_unit_tests ${_unit_test_src} ${_runner_lib_src})
   target_include_directories(mulation_unit_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_compile_definitions(mulation_unit_tests PRIVATE MULATION_VERSION="${PROJECT_VERSION}")
   target_compile_options(mulation_unit_tests PRIVATE -Wall -Wextra -Wpedantic -Werror -pthread)
   target_link_options(mulation_unit_tests PRIVATE -pthread)
@@ -115,6 +119,7 @@ if(MULATION_BUILD_TESTS)
     tests/elf_catalog_test.cpp
     tests/filter_test.cpp
     tests/test_filter_test.cpp
+    tests/mute_lines_test.cpp
   )
   set(_self_sut_src
     runner/catalog.cpp
@@ -135,7 +140,9 @@ if(MULATION_BUILD_TESTS)
                  runner/filter.cpp runner/test_filter.cpp $<TARGET_OBJECTS:mulation_self_sut>)
   target_include_directories(mulation_self_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/runner
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  target_compile_definitions(mulation_self_tests PRIVATE MULATION_VERSION="${PROJECT_VERSION}")
   target_compile_options(mulation_self_tests PRIVATE -Wall -Wextra -Wpedantic -Werror -g -O0)
   target_link_libraries(mulation_self_tests PRIVATE ${MULATION_RUNTIME_TARGET})
   target_include_directories(mulation_self_tests PRIVATE

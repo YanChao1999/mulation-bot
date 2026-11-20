@@ -4,7 +4,7 @@
 #include <sstream>
 
 #ifndef MULATION_VERSION
-#define MULATION_VERSION "0.0.5"
+#define MULATION_VERSION "0.0.6"
 #endif
 
 std::string usage_text(const char *argv0) {
@@ -29,10 +29,12 @@ std::string usage_text(const char *argv0) {
         << "  -j, --jobs N        Parallel mutant workers (default: 1)\n"
         << "  --no-coverage       Run every mutant, not only sites hit by tests\n"
         << "  --allow-empty-coverage  If hitlog is empty, run all mutants (default: fail)\n"
+        << "  --max-survivors N   Stop after N survivors (0 = no limit; partial score)\n"
         << "  --catalog-dir DIR   Also load *.ndjson catalogs from DIR\n"
         << "  --binary PATH       Extra instrumented ELF to read mutants from\n"
         << "  --discover-cmd CMD  sh -c CMD; stdout lines are extra ELF paths\n"
         << "  --json-out FILE     Write machine-readable report\n"
+        << "  --sarif-out FILE    Write SARIF 2.1.0 for GitHub Code Scanning\n"
         << "  -V, --version       Print version and exit\n"
         << "  -h, --help          Show this help\n";
     return out.str();
@@ -253,6 +255,25 @@ ParseResult parse_args(int argc, char **argv) {
             ++i;
             continue;
         }
+        if (a == "--max-survivors") {
+            if (!need("--max-survivors")) {
+                return r;
+            }
+            o.max_survivors = std::atoi(argv[++i]);
+            if (o.max_survivors < 0) {
+                return err(argv0, "mulation: --max-survivors must be >= 0");
+            }
+            ++i;
+            continue;
+        }
+        if (a.rfind("--max-survivors=", 0) == 0) {
+            o.max_survivors = std::atoi(a.c_str() + 16);
+            if (o.max_survivors < 0) {
+                return err(argv0, "mulation: --max-survivors must be >= 0");
+            }
+            ++i;
+            continue;
+        }
         if (a == "--catalog-dir") {
             if (!need("--catalog-dir")) {
                 return r;
@@ -287,6 +308,24 @@ ParseResult parse_args(int argc, char **argv) {
                 return r;
             }
             o.json_out = argv[++i];
+            ++i;
+            continue;
+        }
+        if (a.rfind("--json-out=", 0) == 0) {
+            o.json_out = a.substr(11);
+            ++i;
+            continue;
+        }
+        if (a == "--sarif-out") {
+            if (!need("--sarif-out")) {
+                return r;
+            }
+            o.sarif_out = argv[++i];
+            ++i;
+            continue;
+        }
+        if (a.rfind("--sarif-out=", 0) == 0) {
+            o.sarif_out = a.substr(12);
             ++i;
             continue;
         }

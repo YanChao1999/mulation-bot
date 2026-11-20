@@ -14,8 +14,10 @@ struct Options {
     int jobs = 1;
     bool no_coverage = false;
     bool allow_empty_coverage = false;
+    int max_survivors = 0; // 0 = no limit; stop scheduling after N survivors
     std::string catalog_dir;
     std::string json_out;
+    std::string sarif_out;
     std::string discover_cmd;
     std::string test_filter;
     std::string framework = "auto"; // auto|gtest|ctest|doctest|ztest|custom

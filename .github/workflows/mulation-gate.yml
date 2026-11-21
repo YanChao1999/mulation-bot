@@ -13,8 +13,7 @@ permissions:
 env:
   TEST_BINARY: ./build/compare_tests
   MIN_SCORE: "0"
-  # Stay on last published tag until v0.0.6 release assets exist.
-  MULATION_VERSION: v0.0.5
+  MULATION_VERSION: v0.0.6
   JOBS: "4"
 
 jobs:
